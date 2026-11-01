@@ -40,6 +40,10 @@ function biNode(en, ar, cls){
   return h('span', { class:'bi' + (cls ? ' ' + cls : '') }, h('span', { class:'bi-en', dir:'ltr' }, en));
 }
 function biBtn(en, ar){ return en; }
+/* enOnly: يحذف من عنوان قصير جزءه العربي المفصول بـ « · » (كوسوم الأسئلة وأسماء التظليل في ملفات الدروس)، ويترك العربي الخالص كما هو. */
+function enOnly(s){ s = String(s == null ? '' : s); if (!/[A-Za-z]/.test(s) || !/[\u0600-\u06FF]/.test(s)) return s;
+  var en = s.split(' · ').filter(function(part){ return !/[\u0600-\u06FF]/.test(part); }).join(' · '); return en || s; }
+function arRevealNodes(nodes){ var box = arReveal(' ', false); var inner = box.querySelector('.ar-box'); put(inner, nodes); return box; }
 function arReveal(arContent, isHtml){
   if (!arContent) return null;
   var box = h('div', { class:'ar-box', hidden:true, dir:'rtl', lang:'ar' });
@@ -358,6 +362,7 @@ function selectLesson(id){
     S = normalizeL(readJSON(KEY_L(curLessonId)));
   }
   G.cur = id;
+  if (G.ui) G.ui.openUnit = null;
   saveLocal();
   return true;
 }
@@ -506,6 +511,7 @@ function go(view){ G.ui.view = view; if (view !== 'player') { P = null; G.ui.par
 function render(){
   hideDict(); var v = G.ui.view; if (!G.ui.welcomed) v = 'welcome';
   if (v === 'lesson') { v = G.ui.view = 'home'; }
+  if (v === 'player' && !P && !(G.ui.part && PARTS.some(function(p){ return p.k === G.ui.part; }))) { v = G.ui.view = 'home'; G.ui.part = null; saveLocal(); }
   if (v === 'words') { G.ui.practiceTab = G.ui.wordsTab === 'irregular' ? 'verbs' : 'words'; v = G.ui.view = 'review'; }
   var isTab = TABS.some(function(t){ return t.k === v; });
   $('#nav').hidden = !isTab;
@@ -573,7 +579,11 @@ function todayLesson(){
     h('div', { class:'td-txt' },
       h('p', { class:'td-lbl' }, (u === 0 ? 'Foundation Week' : 'Unit ' + u) + (me.n ? ' · Lesson ' + me.n : '')),
       h('h1', { class:'td-title' }, me.en || D.en || ''),
-      h('p', { class:'td-sub' }, String(D.subEn || me.subEn || '').replace(/^Foundation \d+ · /, '') + (pr.mins ? ' · ' + pr.mins + ' min' + (pr.done ? ' left' : '') : ''))),
+      h('p', { class:'td-sub' }, String(D.subEn || me.subEn || '').replace(/^Foundation \d+ · /, '') + (pr.mins ? ' · ' + pr.mins + ' min' + (pr.done ? ' left' : '') : '')),
+      D.descEn ? h('p', { class:'td-desc' }, D.descEn) : null,
+      h('div', { class:'td-acts' },
+        h('button', { class:'pill-btn sm', type:'button', on:{ click:openAbout } }, ico('info'), 'About lesson'),
+        (D.vocab && D.vocab[0]) ? h('button', { class:'pill-btn sm', type:'button', 'aria-label':'Listen to the first new word', on:{ click:function(){ AUDIO.play(D.vocab[0]); } } }, ico('speaker'), 'Listen') : null)),
     penguin(54, 77, 'td-peng'));
   var doneCard = done ? h('div', { class:'tp-donecard' },
     h('b', {}, 'Lesson complete'),
@@ -598,16 +608,16 @@ function todayLesson(){
   return [head, doneCard, path];
 }
 /* اختبار الوحدة يظهر في الرئيسية حين يُفتح (بعد اكتمال دروس الوحدة)، والاختبار المصغر حين يستحق. */
+function unitTestDue(u){ var ut = unitTestOf(u); if (!ut || !unitLessonsDone(u)) return false; var st = (G.unitTests && G.unitTests[u]) || {}; return st.status !== 'mastered' || !!st.miniQuizDue; }
 function unitTestBanner(){
-  var u = unitOfLesson(curLessonId), ut = unitTestOf(u);
-  if (!ut || !unitLessonsDone(u)) return null;
-  var st = (G.unitTests && G.unitTests[u]) || {};
-  if (st.status === 'mastered' && !st.miniQuizDue) return null;
+  var all = [0].concat((D.units || []).map(function(x){ return x.n; })), u = all.filter(unitTestDue)[0];
+  if (u == null) return null;
+  var ut = unitTestOf(u), st = (G.unitTests && G.unitTests[u]) || {};
   var name = u === 0 ? 'Foundation Week test' : 'Unit ' + u + ' test';
   return h('div', { class:'tbanner' },
     h('span', { class:'tb-ic' }, ico('trophy')),
     h('div', { class:'tb-t' },
-      h('b', {}, st.miniQuizDue ? 'Mini follow-up quiz is due' : st.status ? name + ': aim for mastery' : name + ' is ready'),
+      h('b', {}, st.miniQuizDue ? 'Mini follow-up quiz is due' : st.status === 'review_needed' ? name + ': retake it' : st.status === 'passed' ? name + ': aim for mastery' : name + ' is ready'),
       h('span', {}, ut.legalCorner ? 'Includes the legal corner' : 'Questions you have not seen before')),
     h('button', { class:'btn sm', type:'button', on:{ click:function(){ openSession((st.miniQuizDue ? 'unitMini:' : 'unitTest:') + u); } } }, 'Open'));
 }
@@ -615,9 +625,7 @@ function todayTools(){
   return h('div', { class:'tools' },
     h('button', { class:'tool', type:'button', on:{ click:function(){ openSession('express'); } } }, ico('clock'), h('span', {}, 'Express 15 min')),
     h('button', { class:'tool', type:'button', on:{ click:openCambly } }, ico('chat'), h('span', {}, 'Cambly card')),
-    SAMPLE
-      ? h('button', { class:'tool', type:'button', on:{ click:openAsk } }, ico('help'), h('span', {}, 'Ask the teacher'))
-      : h('button', { class:'tool', type:'button', on:{ click:openAbout } }, ico('dots'), h('span', {}, 'About lesson')));
+    SAMPLE ? h('button', { class:'tool', type:'button', on:{ click:openAsk } }, ico('help'), h('span', {}, 'Ask the teacher')) : null);
 }
 function vHome(){
   return h('section', { class:'scr gut today' }, header(), journeyCard(), todayLesson(), unitTestBanner(), todayTools());
@@ -639,12 +647,13 @@ function unitTestRow(u, l){
   var mPct = (ut && ut.masteryPct) || 90, pPct = (ut && ut.passPct) || 80;
   var title = (l && l.en) || (ut && ut.titleEn) || 'Unit test';
   var cls = 'cl-row ' + (u === 0 ? 'u0-test' : 'u-test');
-  var sub = open ? (st.status === 'mastered' ? 'Mastered (' + mPct + '%+)' : st.status === 'passed' ? 'Passed (' + pPct + '%+). Aim for ' + mPct + '%' : 'Goal ' + mPct + '% · pass ' + pPct + '%') + (ut && ut.legalCorner ? ' · legal corner' : '')
+  var N = (ut && ut.questions && ut.questions.length) || 0, best = st.best != null && N ? ' · best ' + Math.round(st.best / N * 100) + '%' : '';
+  var sub = open ? (st.status === 'mastered' ? 'Mastered (' + mPct + '%+)' : st.status === 'passed' ? 'Passed (' + pPct + '%+). Aim for ' + mPct + '%' : st.status === 'review_needed' ? 'Below ' + pPct + '%. Review the weak lessons, then retake' : 'Goal ' + mPct + '% · pass ' + pPct + '%') + best + (ut && ut.legalCorner ? ' · legal corner' : '')
     : 'Opens after the unit lessons';
   var body = [h('span', { class:'cl-n' + (open ? '' : ' lk') }, open ? ico('trophy') : ico('lock')), h('span', { class:'cl-t' }, h('b', {}, title), h('small', {}, sub))];
   if (!open) return h('li', {}, h('div', { class:cls + ' locked', 'aria-disabled':'true' }, body));
   return h('li', {},
-    h('button', { class:cls, type:'button', on:{ click:function(){ openSession('unitTest:' + u); } } }, body, h('span', { class:st.status ? 'chip-done' : 'chip-now' }, st.status ? (st.status === 'mastered' ? 'Mastered' : 'Passed') : 'Open')),
+    h('button', { class:cls, type:'button', on:{ click:function(){ openSession('unitTest:' + u); } } }, body, h('span', { class:(st.status === 'mastered' || st.status === 'passed') ? 'chip-done' : 'chip-now' }, st.status === 'mastered' ? 'Mastered' : st.status === 'passed' ? 'Passed' : st.status === 'review_needed' ? 'Retake' : 'Open')),
     st.miniQuizDue ? h('button', { class:'btn sm out cl-mini', type:'button', on:{ click:function(){ openSession('unitMini:' + u); } } }, ico('review'), 'Mini follow-up quiz') : null);
 }
 function unitHasList(u){ var list = D['unit' + u + 'Lessons']; return Array.isArray(list) && list.length > 0; }
@@ -672,7 +681,7 @@ function unitNode(u, openN){
   if (openN !== u.n) return h('li', { class:'tl-it' }, node,
     h('button', { class:'tl-row', type:'button', 'aria-expanded':'false', on:{ click:toggle } },
       h('span', { class:'tl-t' }, h('b', {}, u.en), h('small', {}, sub)),
-      h('span', { class:'tl-prog' }, doneN + '/' + lessons.length), ico('down')));
+      unitTestDue(u.n) ? h('span', { class:'chip-now' }, 'Test ready') : h('span', { class:'tl-prog' }, doneN + '/' + lessons.length), ico('down')));
   var rows = list.map(function(l){
     if (l.test) return unitTestRow(u.n, l);
     var done = l.open && l.id && isLessonDone(l.id), isNext = l.id === curLessonId && !done;
@@ -990,9 +999,10 @@ var EN_LABELS = {
   'التالي: الكتابة': 'Next: Writing',
   'التالي: الاختبار': 'Next: Short Quiz',
   'إنهاء المهمة': 'Finish Writing Stage',
-  'رجوع للدرس': 'Back to Lesson',
-  'رجوع للمراجعة': 'Back to Review',
-  'رجوع للكلمات': 'Back to Words',
+  'رجوع للدرس': 'Back to Today',
+  'رجوع للمراجعة': 'Back to Practice',
+  'رجوع للكلمات': 'Back to Practice',
+  'رجوع للدروس': 'Back to Course',
   'احفظ الإجابة': 'Save answer'
 };
 function formatCtaLabel(label){
@@ -1235,7 +1245,7 @@ function stMatch(ctl){ var box = h('div', { class:'mt-box' });
     h('div', { class:'fb' }, h('span', { class:'fb-ic' }, ico('check')),
       h('div', { class:'fb-t' },
         h('b', {}, 'Game Complete'),
-        h('p', {}, misses == null ? ('You matched all ' + totalW + ' words with their meanings.') : (misses === 0 ? 'Zero mistakes. Great job!' : 'Wrong attempts: ' + misses + ' · عدد المحاولات الخاطئة: ' + misses)))),
+        h('p', {}, misses == null ? ('You matched all ' + totalW + ' words with their meanings.') : (misses === 0 ? 'Zero mistakes. Great job!' : 'Wrong attempts: ' + misses)))),
     h('button', { class:'btn out sm', type:'button', style:'align-self:flex-start', on:{ click:function(){ M_POOL = null; M = mkRound(0, 0); draw(); } } }, biBtn('New Random Round', 'جولة عشوائية جديدة'))); }
   function draw(){ ctl.set('التالي', !!S.match, nextStep);
     var byEn = {}; ALL_VOCAB.forEach(function(v){ byEn[v.en] = v; });
@@ -1271,7 +1281,7 @@ function fbCard(ok, why, ev, fix, whyEn, head){
 }
 function blankText(s, word){ return s.replace('___', word || '...'); }
 function qCard(content, opts){ opts = opts || {};
-  var c = h('div', { class:'qcard' + (opts.tag ? ' top' : '') }, opts.tag ? h('span', { class:'q-tag' }, opts.tag) : null, content);
+  var c = h('div', { class:'qcard' + (opts.tag ? ' top' : '') }, opts.tag ? h('span', { class:'q-tag' }, enOnly(opts.tag)) : null, content);
   return c; }
 /* الوضع الصامت (o.quiet) في MCQ وTyping، ويُستعمل في الاختبار القبلي وحده: بعد الإجابة لا صح ولا خطأ ولا بطاقة ولا جواب،
    بل حالة «حُفظت» محايدة وسطر صغير. وبدون o.quiet يبقى السلوك كما كان في الدروس والاختبارات والمراجعات. */
@@ -1468,9 +1478,9 @@ function stEmail(ctl){ var r = D.reading, raw = (r.paras || []).join(' ');
   var mail = h('article', { class:'mail' + (S.hl ? ' hl-on' : ''), 'aria-label':'Second Reading · القراءة الثانية' }, mailHead(r), emailBody(false));
   /* أسماء الألوان من الدرس (reading.lg1 / lg2 / lg3)، ولا يُشرح لون لا يستعمله نصه. */
   var legend = h('div', { class:'legend', hidden:!S.hl },
-    raw.indexOf('<<s:') >= 0 ? h('span', { class:'lg s' }, r.lg1 || 'Present Simple') : null,
-    raw.indexOf('<<c:') >= 0 ? h('span', { class:'lg c' }, r.lg2 || 'Present Continuous') : null,
-    raw.indexOf('<<t:') >= 0 ? h('span', { class:'lg t' }, r.lg3 || 'Signal word') : null);
+    raw.indexOf('<<s:') >= 0 ? h('span', { class:'lg s' }, enOnly(r.lg1) || 'Present Simple') : null,
+    raw.indexOf('<<c:') >= 0 ? h('span', { class:'lg c' }, enOnly(r.lg2) || 'Present Continuous') : null,
+    raw.indexOf('<<t:') >= 0 ? h('span', { class:'lg t' }, enOnly(r.lg3) || 'Signal word') : null);
   var nW = Math.max(10, Math.round(readingWords(r) / 10) * 10);
   var tg = h('input', { type:'checkbox', id:'hlToggle' }); tg.checked = !!S.hl;
   tg.addEventListener('change', function(){ S.hl = tg.checked; saveLocal(); mail.classList.toggle('hl-on', S.hl); legend.hidden = !S.hl; });
@@ -1485,7 +1495,7 @@ function stEmail(ctl){ var r = D.reading, raw = (r.paras || []).join(' ');
     r.introEn ? h('p', { class:'en', dir:'ltr', style:'font-size:14.5px;font-weight:600;color:var(--ink-2);text-align:left' }, r.introEn) : null,
     r.introEn ? null : h('p', { class:'muted', html:arHTML(r.intro) }),
     h('div', { class:'mail-tools' },
-      h('label', { class:'toggle', for:'hlToggle' }, tg, h('span', {}, r.hlLabel || 'Highlight grammar')),
+      h('label', { class:'toggle', for:'hlToggle' }, tg, h('span', {}, enOnly(r.hlLabel) || 'Highlight grammar')),
       flBtn,
       h('span', { class:'hint' }, 'Tap underlined words for meaning, Oxford ↗ & human audio')),
     legend, mail
@@ -1532,7 +1542,7 @@ function stListen1(ctl){
     ctl.set('إلى الأسئلة', true, function(){ S.listen1Done = true; touch(); nextStep(); });
   }
   return [
-    label('Listening · Stage 1 of 3 (Main Idea — No Transcript)', 'الاستماع ١ من ٣ · الفكرة العامة بدون النص المكتوب', h('span', { class:'tag' }, L.sourceTag || 'Audio Clip')),
+    label('Listening · Stage 1 of 3 (Main Idea — No Transcript)', 'الاستماع ١ من ٣ · الفكرة العامة بدون النص المكتوب', h('span', { class:'tag' }, enOnly(L.sourceTag) || 'Audio Clip')),
     h('div', { class:'rtimer' },
       biNode('Step 1: Listen once in the source page for the main idea without looking at the transcript, then answer the main-idea question below.', 'الخطوة ١: استمع مرة واحدة للفكرة العامة بدون قراءة النص المكتوب، ثم أجب عن سؤال الفكرة العامة بالأسفل.'),
       tSpan),
@@ -1674,7 +1684,7 @@ function renderErrorAnalysis(quizWrongs){
       return h('div', { class:'err-cat' },
         h('div', { class:'err-cat-h' },
           biNode(info.en, info.ar),
-          h('span', { class:'tag' }, h('bdi', { class:'en', dir:'ltr' }, list.length + (list.length === 1 ? ' item' : ' items')), ' · ' + (list.length === 1 ? 'سؤال' : 'أسئلة'))),
+          h('span', { class:'tag' }, list.length + (list.length === 1 ? ' item' : ' items'))),
         h('div', { class:'err-cat-why' },
           h('p', { class:'en', dir:'ltr', style:'font-weight:600;color:var(--ink);text-align:left' }, 'Why it happens: ' + info.whyEn),
           arReveal(info.whyAr, false)),
@@ -1842,7 +1852,7 @@ function stWriting(ctl){
 /* شرح ألوان النموذج من الدرس (legendEn / legendAr)، وإلا سطر عام إن كان في النموذج تلوين (<<s: أو <<c:)،
    ولا سطر لنموذج بلا ألوان (u0l4). */
 function writingModelLegend(W, src){
-  if (W.legendEn || W.legendAr) return [W.legendEn, W.legendAr].filter(Boolean).join(' · ');
+  if (W.legendEn || W.legendAr) return W.legendEn || W.legendAr;
   return /<<[sc]:/.test(src || '') ? 'Highlighted words show today\'s grammar and lesson words' : '';
 }
 function paintFeedback(box, fb){
@@ -1874,9 +1884,9 @@ var PART_SCORE = {
   grammar:function(){ return scoreOf([].concat(IDS.gA, IDS.gB, IDS.gC, IDS.gD)); },
   reading:function(){ return scoreOf((D.listening && !D.reading) ? IDS.lq : IDS.rq); },
   writing:function(){ return S.writing.fb ? 'Paragraph score: ' + S.writing.fb.score + '/10' : 'Paragraph saved'; },
-  quiz:function(){ return S.quiz.best != null ? S.quiz.best + ' of ' + D.quiz.length + ' · ' + S.quiz.best + ' من ' + D.quiz.length : ''; }
+  quiz:function(){ return S.quiz.best != null ? S.quiz.best + ' of ' + D.quiz.length : ''; }
 };
-function scoreOf(ids){ var c = (ids || []).filter(function(id){ return S.ans[id] && S.ans[id].c; }).length, a = (ids || []).filter(function(id){ return S.ans[id]; }).length; return c + ' correct of ' + a + ' · ' + c + ' صحيحة من ' + a; }
+function scoreOf(ids){ var c = (ids || []).filter(function(id){ return S.ans[id] && S.ans[id].c; }).length, a = (ids || []).filter(function(id){ return S.ans[id]; }).length; return c + ' correct of ' + a; }
 function stDone(k, ctl){ updateProgress(); var p = partOf(k), idx = PARTS.indexOf(p), nxt = PARTS[idx + 1], pr = lessonProgress(), all = pr.done === pr.total, isDone = !!S.stamps[k];
   if (all) ctl.set('رجوع للدرس', true, closePlayer);
   else if (nxt) ctl.set('التالي: ' + nxt.ar, true, function(){ openPart(nxt.k); });
@@ -1898,7 +1908,7 @@ function stExpressIntro(ctl){
     label('Busy-Day Express Mode · 15 Minutes', 'الوضع المختصر للأيام المزحومة · ١٥ دقيقة'),
     h('h1', { class:'bi-h' }, h('span', { class:'en', dir:'ltr' }, '15-Minute Express Review'), h('small', {}, 'مراجعة سريعة تحفظ سلسلتك في الأيام المزحومة')),
     h('p', { class:'en-p', dir:'ltr' }, 'Short on time today? Complete 3 active recall words from memory, 3 key flashcards (including the legal phrase), and 2 targeted Error Lab drills.'),
-    h('p', {}, 'يومك مزحوم؟ أنجز ٣ كلمات بالاسترجاع النشط كتابةً، و٣ بطاقات (مع العبارة القانونية)، وسؤالين من مختبر الأخطاء. تُسجَّل جلسة مراجعة (+١٥ دقيقة في ساعات الدراسة) لا درسًا مكتملًا.'),
+    arReveal('يومك مزحوم؟ أنجز ٣ كلمات بالاسترجاع النشط كتابةً، و٣ بطاقات (مع العبارة القانونية)، وسؤالين من مختبر الأخطاء. تُسجَّل جلسة مراجعة (+١٥ دقيقة في ساعات الدراسة) لا درسًا مكتملًا.', false),
     h('ul', {}, [
       ['pen', '3 Active Recall words typed from memory', '٣ كلمات استرجاع نشط كتابةً من الذاكرة'],
       ['cards', '3 Flashcards + Legal Phrase with human audio', '٣ بطاقات مع العبارة القانونية والنطق البشري'],
@@ -2133,9 +2143,9 @@ function stUnitLegal(st, ctl){
     h('div', { class:'qi' },
       h('h1', { class:'bi-h' }, h('span', { class:'en', dir:'ltr', style:'color:#fff' }, ut.titleEn), h('small', { style:'color:var(--honey)' }, ut.titleAr)),
       h('p', { class:'en', dir:'ltr', style:'color:#fff;font-weight:600;text-align:left' }, n.N + ' new questions' + (ut.appliedTask ? ' + a short applied writing task' : '') + '. Mastery target: ' + n.m + '% (' + n.mN + '/' + n.N + '). Passing threshold: ' + n.p + '% (' + n.pN + '/' + n.N + ').'),
-      h('p', {}, newAr + ' لم تظهر في الدروس' + (ut.appliedTask ? ' + مهمة تطبيقية قصيرة' : '') + '. هدف الإتقان ' + arDigits(n.m) + '٪ (' + arDigits(n.mN) + '/' + arDigits(n.N) + ')، وحد العبور ' + arDigits(n.p) + '٪ (' + arDigits(n.pN) + '/' + arDigits(n.N) + '): من ' + arDigits(n.p) + ' إلى ' + arDigits(n.m - 1) + '٪ تعبر الوحدة وتعود أخطاؤك لمختبر الأخطاء مع اختبار مصغر الأسبوع التالي، وأقل من ' + arDigits(n.p) + '٪ تراجع الدروس الضعيفة أولًا.'),
+      arReveal(newAr + ' لم تظهر في الدروس' + (ut.appliedTask ? ' + مهمة تطبيقية قصيرة' : '') + '. هدف الإتقان ' + arDigits(n.m) + '٪ (' + arDigits(n.mN) + '/' + arDigits(n.N) + ')، وحد العبور ' + arDigits(n.p) + '٪ (' + arDigits(n.pN) + '/' + arDigits(n.N) + '): من ' + arDigits(n.p) + ' إلى ' + arDigits(n.m - 1) + '٪ تعبر الوحدة وتعود أخطاؤك لمختبر الأخطاء مع اختبار مصغر الأسبوع التالي، وأقل من ' + arDigits(n.p) + '٪ تراجع الدروس الضعيفة أولًا.', false),
       h('div', { class:'qi-stats' },
-        h('div', { class:'qs' }, h('b', {}, String(n.N)), h('span', {}, 'New Qs · ' + (n.N >= 3 && n.N <= 10 ? 'أسئلة جديدة' : 'سؤالًا جديدًا'))),
+        h('div', { class:'qs' }, h('b', {}, String(n.N)), h('span', {}, 'New questions')),
         h('div', { class:'qs' }, h('b', { dir:'ltr' }, n.m + '%'), h('span', {}, 'Mastery')),
         h('div', { class:'qs' }, h('b', { dir:'ltr' }, n.p + '%'), h('span', {}, 'Pass')))),
     lc ? h('div', { class:'sec-h' }, h('h2', { class:'bi-h', style:'font-size:17px' }, h('span', { class:'en', dir:'ltr' }, lc.titleEn), h('small', {}, lc.titleAr))) : null,
@@ -2357,11 +2367,11 @@ function stPreTestIntro(st, ctl){
       ? 'Answers and explanations appear at the end.'
       : 'No feedback while you answer: answers and explanations appear at the end. If you leave midway, it still counts as your first attempt, and unanswered questions count as wrong.'),
     pt.noteEn ? h('p', { class:'en pt-note', dir:'ltr', style:'text-align:left' }, pt.noteEn) : null,
-    practice
+    arRevealNodes([practice
       ? h('p', {}, 'هذه محاولة تدريب لا تغيّر الإعفاء، فقد حُسبت محاولتك الأولى في هذا الاختبار القبلي من قبل' + (pf ? ' (' + arDigits(pfPct) + '٪' + (pfEx ? ' — معفى' : '') + ')' : '') + countsAr + ' وتظهر الإجابات والشروح في النهاية.')
       : [h('p', {}, pt.ruleNoteAr + countsAr),
          h('p', {}, 'المحاولة الأولى وحدها هي التي تُحسب للإعفاء، ويلزمك ' + arDigits(need) + ' من ' + arDigits(n) + ' فأكثر (٩٠٪). ولا تظهر الإجابات والشروح إلا في النهاية، والخروج في المنتصف يُعدّ محاولتك الأولى وتُحسب الأسئلة التي لم تُجب خاطئة. أما حد العبور العادي للوحدة فيبقى ٨٠٪.')],
-    pt.noteAr ? h('p', { class:'pt-note' }, pt.noteAr) : null,
+    pt.noteAr ? h('p', { class:'pt-note' }, pt.noteAr) : null]),
     h('div', { class:'qi-stats' },
       h('div', { class:'qs' }, h('b', {}, String(n)), h('span', {}, 'Questions')),
       h('div', { class:'qs' }, h('b', { dir:'ltr' }, typed + '/' + n), h('span', {}, 'Typing')),
@@ -2622,9 +2632,9 @@ function openPlan(){
     ].map(function(r){ return h('div', { class:'rowi' }, biNode(r[0][0], r[0][1]), biNode(r[1][0], r[1][1])); })),
     backupWidgetNode(),
     h('h3', { class:'bi-h', style:'font-size:15.5px' }, h('span', { class:'en', dir:'ltr' }, 'Weekly Rhythm'), h('small', {}, 'إيقاع الأسبوع')),
-    h('div', { class:'week' }, D.week.map(function(w){ return h('div', { class:'day' + (w.k === 'test' ? ' t' : w.k === 'rest' ? ' r' : '') }, h('b', {}, (w.dEn ? w.dEn + ' · ' : '') + w.d), h('span', {}, (w.tEn ? w.tEn + ' · ' : '') + w.t)); })),
+    h('div', { class:'week' }, D.week.map(function(w){ return h('div', { class:'day' + (w.k === 'test' ? ' t' : w.k === 'rest' ? ' r' : '') }, h('b', {}, w.dEn || w.d), h('span', {}, w.tEn || w.t)); })),
     h('h3', { class:'bi-h', style:'font-size:15.5px' }, h('span', { class:'en', dir:'ltr' }, 'Daily Lesson Structure (60 min · 6 Stages)'), h('small', {}, 'هيكل الدرس اليومي (60 دقيقة · 6 مراحل)')),
-    h('ul', { class:'anat' }, D.anatomy.map(function(a){ return h('li', {}, h('span', { class:'an-m', 'aria-label':a.m + ' دقائق' }, String(a.m)), h('span', { class:'an-t', html:'<b>' + esc((a.nEn ? a.nEn + ' · ' : '') + a.n) + ':</b> ' + arHTML(a.soon ? a.d + ' (في الكورس الكامل)' : a.d) })); })),
+    h('ul', { class:'anat' }, D.anatomy.map(function(a){ return h('li', {}, h('span', { class:'an-m', 'aria-label':a.m + ' دقائق' }, String(a.m)), h('span', { class:'an-t', html:'<b>' + esc(a.nEn || a.n) + ':</b> ' + (a.dEn ? esc(a.dEn) + (a.soon ? ' (full course)' : '') : arHTML(a.soon ? a.d + ' (في الكورس الكامل)' : a.d)) })); })),
     h('h3', { class:'bi-h', style:'font-size:15.5px' }, h('span', { class:'en', dir:'ltr' }, 'How Progress Works'), h('small', {}, 'كيف يُحسب تقدمك')),
     h('ul', { class:'rules' }, [
       'Every stage you complete is stamped on the lesson page.',
@@ -2649,7 +2659,7 @@ function openAbout(){
 var SAMPLE = null;
 var AI_OFF = ['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'];
 function initAI(){ if (!(window.claude && typeof window.claude.use === 'function')) return;
-  window.claude.use('sample').then(function(s){ var had = !!SAMPLE; SAMPLE = typeof s === 'function' ? s : null; if (!!SAMPLE !== had && (G.ui.view === 'player' || G.ui.view === 'lesson')) render(); }, function(){ SAMPLE = null; }); }
+  window.claude.use('sample').then(function(s){ var had = !!SAMPLE; SAMPLE = typeof s === 'function' ? s : null; if (!!SAMPLE !== had && (G.ui.view === 'player' || G.ui.view === 'lesson' || G.ui.view === 'home')) render(); }, function(){ SAMPLE = null; }); }
 function aiErr(code){
   if (code === 'rate_limited') return 'Usage limit reached temporarily. Try again shortly.';
   if (code === 'session_expired') return 'Session expired. Please sign in again.';

@@ -732,7 +732,7 @@ button.uo-row .uo-k{background:var(--accent);color:#fff}
 .sync-lbl{font-size:12px;font-weight:700;color:var(--muted)}
 .sync-in{width:100%;min-height:44px;padding:8px 12px;border-radius:12px;border:1.5px solid var(--line-dark);background:var(--bg);color:var(--ink);font-family:var(--f-en);font-size:15px;direction:ltr;text-align:start}
 .sync-in:focus{outline:2px solid var(--dark);outline-offset:1px}
-.sync-adv summary{font-size:12px;color:var(--muted);cursor:pointer;direction:rtl}
+.sync-adv summary{font-size:12px;color:var(--muted);cursor:pointer}
 .sync-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 .rv-due{flex:none;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;background:var(--simple-bg);color:var(--dark)}
 .rv-due.now{background:var(--accent-soft);color:var(--accent-ink)}
@@ -813,7 +813,7 @@ body{font-family:var(--f-en)}
 .tb-t{flex:1;min-width:0;display:flex;flex-direction:column}
 .tb-t b{font-size:15px;color:var(--ink)}
 .tb-t span{font-size:12.5px;color:var(--muted)}
-.tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tools{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px}
 .tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:72px;padding:8px 6px;border-radius:18px;border:1px solid var(--line);background:var(--surface);color:var(--dark);font-family:var(--f-en);font-size:12.5px;font-weight:700;cursor:pointer;text-align:center}
 .tool .ico{width:21px;height:21px}
 
@@ -904,3 +904,7 @@ body{font-family:var(--f-en)}
 .stage-info .ico{width:18px;height:18px;flex:none;color:var(--dark);margin-top:2px}
 .qcard .q-ar.sub{font-size:14.5px;font-weight:400;line-height:1.6;color:#DCE4EE;text-align:left}
 .task .task-ar{text-align:left}
+.td-desc{font-size:14px;line-height:1.45;color:var(--ink-2);margin-top:6px}
+.td-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.pill-btn.sm{height:34px;padding:0 12px;font-size:12.5px}
+.pill-btn.sm .ico{width:15px;height:15px}

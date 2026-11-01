@@ -602,7 +602,7 @@ function fakeGitHub(token) {
     // 1) الوحدة 9: مقدمة المحاولة الأولى، ثم كل البنود صحيحة
     await openPre(9);
     const intro1 = await text(page);
-    ok(/Only your FIRST attempt counts for the exemption/.test(intro1) && /10 questions \(8 typing \+ 2 multiple choice\)/.test(intro1) && /at least 9 of 10 \(90%\)/.test(intro1) && /answers and explanations appear at the end/i.test(intro1) && /leave midway, it still counts as your first attempt/.test(intro1) && intro1.includes('المحاولة الأولى وحدها') && !/practice attempt/i.test(intro1),
+    ok(/Only your FIRST attempt counts for the exemption/.test(intro1) && /10 questions \(8 typing \+ 2 multiple choice\)/.test(intro1) && /at least 9 of 10 \(90%\)/.test(intro1) && /answers and explanations appear at the end/i.test(intro1) && /leave midway, it still counts as your first attempt/.test(intro1) && (await page.locator('#screen .ar-box').first().evaluate(el => el.textContent)).includes('المحاولة الأولى وحدها') && !/practice attempt/i.test(intro1),
       'pre-test intro (first attempt): the counts come from the items, only the FIRST attempt counts, answers appear at the end, leaving midway still counts');
     await cta(page);
     const its9 = await items(9);
