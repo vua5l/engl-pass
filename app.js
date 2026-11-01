@@ -10,8 +10,10 @@ var D = BASE;
 function lessonData(id){ return Object.assign({}, BASE, (typeof LESSONS !== 'undefined' && LESSONS[id]) || {}); }
 function $(s, r){ return (r||doc).querySelector(s); }
 function $$(s, r){ return Array.prototype.slice.call((r||doc).querySelectorAll(s)); }
+var AUTO_DIR = { P:1, LI:1, SMALL:1, H1:1, H2:1, H3:1, LABEL:1, SUMMARY:1, TD:1, TH:1, Q:1, BLOCKQUOTE:1 };
 function h(tag, attrs){
   var el = doc.createElement(tag), k, v;
+  if (AUTO_DIR[el.tagName] && !(attrs && attrs.dir)) el.setAttribute('dir', 'auto');
   if (attrs) for (k in attrs){ if (!Object.prototype.hasOwnProperty.call(attrs, k)) continue; v = attrs[k];
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v;
@@ -32,18 +34,15 @@ function shuffle(a){ a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var
 var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 /* bilingual UI builders (English first, Arabic small underneath) */
+/* منذ 1 نوفمبر 2026 (قرار المتعلم): العناوين والأزرار بالإنجليزي وحده، والعربي سطر تحت تعليمات الأسئلة فقط (label)،
+   وفي الشرح خلف «اعرض بالعربي». فيبقى المعامل الثاني مقبولًا ولا يُعرض. */
 function biNode(en, ar, cls){
-  return h('span', { class:'bi' + (cls ? ' ' + cls : '') },
-    h('span', { class:'bi-en', dir:'ltr' }, en),
-    ar ? h('small', { class:'bi-ar', html:arHTML(ar) }) : null);
+  return h('span', { class:'bi' + (cls ? ' ' + cls : '') }, h('span', { class:'bi-en', dir:'ltr' }, en));
 }
-function biBtn(en, ar){
-  if (!ar) return en;
-  return h('span', { class:'btn-bi' }, h('span', { class:'en', dir:'ltr' }, en), h('small', {}, ar));
-}
+function biBtn(en, ar){ return en; }
 function arReveal(arContent, isHtml){
   if (!arContent) return null;
-  var box = h('div', { class:'ar-box', hidden:true });
+  var box = h('div', { class:'ar-box', hidden:true, dir:'rtl', lang:'ar' });
   if (isHtml) box.innerHTML = arContent; else box.innerHTML = '<p>' + arHTML(arContent) + '</p>';
   var btn = h('button', { class:'ar-btn', type:'button', 'aria-expanded':'false' }, 'اعرض بالعربي');
   btn.addEventListener('click', function(e){
@@ -62,9 +61,15 @@ function svg(p, sw){ return '<svg viewBox="0 0 24 24" fill="none" stroke="curren
 var IC = {
   check: svg('<path d="M5 12.5l4.5 4.5L19 7"/>', 2.6),
   x: svg('<path d="M6 6l12 12M18 6L6 18"/>', 2.2),
-  fwd: svg('<path d="M19 12H5M11 6l-6 6 6 6"/>', 2.2),
-  back: svg('<path d="M5 12h14M13 6l6 6-6 6"/>', 2.2),
-  chev: svg('<path d="M15 6l-6 6 6 6"/>', 2.6),
+  /* الصفحة من اليسار منذ 1 نوفمبر 2026: «التالي» يشير يمينًا و«رجوع» يسارًا. */
+  fwd: svg('<path d="M5 12h14M13 6l6 6-6 6"/>', 2.2),
+  back: svg('<path d="M19 12H5M11 6l-6 6 6 6"/>', 2.2),
+  chev: svg('<path d="M9 6l6 6-6 6"/>', 2.6),
+  down: svg('<path d="M6 9l6 6 6-6"/>', 2.4),
+  up: svg('<path d="M6 15l6-6 6 6"/>', 2.4),
+  chat: svg('<path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V16.5H5A1.5 1.5 0 0 1 3.5 15V7A1.5 1.5 0 0 1 5 5.5z"/>'),
+  help: svg('<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><path d="M12 16.8v.2"/>'),
+  info: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><path d="M12 7.6v.2"/>'),
   lock: svg('<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>', 2.2),
   home: svg('<path d="M4 11l8-7 8 7v8.5a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H5.5A1.5 1.5 0 0 1 4 19.5z"/>'),
   book: svg('<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/>'),
@@ -382,7 +387,7 @@ function oxUrl(wordOrObj){
   return 'https://www.oxfordlearnersdictionaries.com/definition/english/' + encodeURIComponent(slug);
 }
 function oxBtn(wordOrObj, label){
-  var a = h('a', { class:'ox-link', href:oxUrl(wordOrObj), target:'_blank', rel:'noopener noreferrer', 'aria-label':(label || 'Oxford Dictionary · قاموس أوكسفورد') }, 'Oxford ↗');
+  var a = h('a', { class:'ox-link', href:oxUrl(wordOrObj), target:'_blank', rel:'noopener noreferrer', 'aria-label':(label || 'Oxford Dictionary') }, 'Oxford ↗');
   a.addEventListener('click', function(e){ e.stopPropagation(); });
   return a;
 }
@@ -436,16 +441,16 @@ var AUDIO = {
   play: function(target){
     var files = AUDIO.filesFor(target);
     if (!files.length) {
-      toast('Open Oxford ↗ to hear pronunciation · افتح رابط Oxford ↗ لسماع النطق');
+      toast('Open Oxford ↗ to hear pronunciation');
       return;
     }
     AUDIO.playSeq(files, 0, function(){
-      toast('Audio requires internet or Oxford ↗ · تعذّر تشغيل ملف الصوت، جرّب رابط Oxford ↗');
+      toast('Audio requires internet or Oxford ↗');
     });
   }
 };
 function sayBtn(target, label, cls){
-  var b = h('button', { class:'ib say ' + (cls || 'sm light'), type:'button', 'aria-label':label || 'Human Pronunciation · نطق بشري' }, ico('speaker'));
+  var b = h('button', { class:'ib say ' + (cls || 'sm light'), type:'button', 'aria-label':label || 'Human Pronunciation' }, ico('speaker'));
   b.addEventListener('click', function(e){ e.stopPropagation(); AUDIO.play(typeof target === 'function' ? target() : target); });
   return b;
 }
@@ -489,24 +494,27 @@ function mistakeIds(){ var now = Date.now(); return allMistakeKeys().filter(func
 function courseDay(){ return Math.max(0, Math.floor((Date.now() - (G.startedAt || Date.now())) / 864e5)); }
 
 /* ---------- routing ---------- */
+/* ثلاثة أقسام منذ 1 نوفمبر 2026: اليوم (الرئيسية وصفحة الدرس معًا)، والكورس، والتدريب (المراجعة والكلمات معًا).
+   وتبقى مفاتيح الواجهات القديمة lesson وwords أسماءً بديلة: lesson تعرض «اليوم»، وwords تعرض «التدريب» على الكلمات. */
 var TABS = [
-  { k:'home', en:'Home', ar:'الرئيسية', ic:'home' },
-  { k:'lessons', en:'Lessons', ar:'الدروس', ic:'book' },
-  { k:'words', en:'Words', ar:'الكلمات', ic:'cards' },
-  { k:'review', en:'Review', ar:'المراجعة', ic:'review' }
+  { k:'home', en:'Today', ar:'اليوم', ic:'home' },
+  { k:'lessons', en:'Course', ar:'الكورس', ic:'book' },
+  { k:'review', en:'Practice', ar:'التدريب', ic:'review' }
 ];
 var P = null;
 function go(view){ G.ui.view = view; if (view !== 'player') { P = null; G.ui.part = null; } saveLocal(); render(); try { window.scrollTo(0, 0); } catch (e) {} }
 function render(){
   hideDict(); var v = G.ui.view; if (!G.ui.welcomed) v = 'welcome';
+  if (v === 'lesson') { v = G.ui.view = 'home'; }
+  if (v === 'words') { G.ui.practiceTab = G.ui.wordsTab === 'irregular' ? 'verbs' : 'words'; v = G.ui.view = 'review'; }
   var isTab = TABS.some(function(t){ return t.k === v; });
   $('#nav').hidden = !isTab;
   var view = v === 'welcome' ? vWelcome() : v === 'home' ? vHome() : v === 'lessons' ? vLessons() : v === 'words' ? vWords() : v === 'review' ? vReview() : v === 'lesson' ? vLesson() : vPlayer();
   put($('#screen'), view); updateNav(); }
 function updateNav(){ var nav = $('#nav'), n = mistakeIds().length;
   put(nav, TABS.map(function(t){ var on = G.ui.view === t.k;
-    return h('button', { class:'nav-it' + (on ? ' on' : ''), type:'button', 'aria-label':t.en + ' · ' + t.ar, 'aria-current':on ? 'page' : null, on:{ click:function(){ go(t.k); } } },
-      ico(t.ic), h('span', { class:'lbl' }, h('span', { class:'en', dir:'ltr' }, t.en), h('small', {}, t.ar)), (t.k === 'review' && n && !on) ? h('span', { class:'nav-dot', 'aria-hidden':'true' }) : null); })); }
+    return h('button', { class:'nav-it' + (on ? ' on' : ''), type:'button', 'aria-label':t.en, 'aria-current':on ? 'page' : null, on:{ click:function(){ go(t.k); } } },
+      ico(t.ic), h('span', { class:'lbl' }, t.en), (t.k === 'review' && n && !on) ? h('span', { class:'nav-dot', 'aria-hidden':'true' }) : null); })); }
 
 /* ---------- welcome ---------- */
 function vWelcome(){
@@ -519,125 +527,126 @@ function vWelcome(){
     h('div', { class:'wel-cta gut' }, h('button', { class:'btn', type:'button', on:{ click:function(){ G.ui.welcomed = true; if (!G.startedAt) G.startedAt = Date.now(); touch(); go('home'); } } }, biBtn("Let's Start", 'لنبدأ'))));
 }
 
-/* ---------- home ---------- */
-function header(){ var n = mistakeIds().length, d = courseDay(), wk = Math.min(32, Math.floor(d / 7) + 1), dy = d + 1;
+/* ---------- today: progress and place first, then today's lesson (تصميم 1 نوفمبر 2026) ----------
+   الرئيسية تجمع ما كان في الرئيسية وصفحة الدرس: رحلتك ومكانك، ثم مراحل درس اليوم وزر البدء، ثم الأدوات. */
+function header(){ var d = courseDay(), wk = Math.min(32, Math.floor(d / 7) + 1);
   return h('header', { class:'hd' },
-    h('div', { class:'who' }, h('span', { class:'avatar', 'aria-hidden':'true', html:'<svg width="42" height="42" viewBox="0 0 42 42" focusable="false"><circle cx="21" cy="16" r="8.5" fill="#2C4A6E"/><path d="M5 42c1.6-9.5 8-15 16-15s14.4 5.5 16 15z" fill="#2C4A6E"/></svg>' }),
-      h('div', { class:'who-t' },
-        h('small', {}, h('bdi', { class:'en', dir:'ltr' }, 'Welcome!'), ' · أهلًا!'),
-        h('b', {}, h('bdi', { class:'en', dir:'ltr' }, 'Week ' + wk + ' · Day ' + dy), ' · الأسبوع ' + wk + ' · اليوم ' + dy))),
-    h('div', { class:'hd-act' },
-      h('button', { class:'ib', type:'button', 'aria-label':'Mistake Notebook · دفتر الأخطاء' + (n ? '، ' + n + ' أسئلة مستحقة اليوم' : ''), on:{ click:function(){ go('review'); } } }, ico('mark'), n ? h('span', { class:'badge', 'aria-hidden':'true' }, String(n)) : null),
-      h('button', { class:'ib', id:'gearBtn', type:'button', 'aria-label':'Settings & Plan · الإعدادات والخطة', on:{ click:openPlan } }, ico('gear'), SYNC.hasProblem() ? h('span', { class:'sync-dot', 'aria-hidden':'true' }) : null)));
+    h('p', { class:'hd-week' }, 'Week ' + wk + ' · Day ' + (d + 1)),
+    h('button', { class:'ib', id:'gearBtn', type:'button', 'aria-label':'Settings and plan', on:{ click:openPlan } }, ico('gear'), SYNC.hasProblem() ? h('span', { class:'sync-dot', 'aria-hidden':'true' }) : null));
 }
-function journeyCard(){ var pr = lessonProgress(), d = courseDay(), week = Math.min(32, Math.floor(d / 7) + 1);
-  var lessonsDone = courseOrder().filter(isLessonDone).length, coursePct = Math.min(100, lessonsDone / 192 * 100);
-  var fill = coursePct > 0 ? Math.max(3, coursePct) : 0;
-  var curve = '<svg viewBox="0 0 350 84" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M322 66 C 262 68, 236 36, 186 40 S 92 14, 30 12" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
-    (fill ? '<path d="M322 66 C 262 68, 236 36, 186 40 S 92 14, 30 12" pathLength="100" stroke-dasharray="' + fill + ' 100" fill="none" stroke="#F2B857" stroke-width="3" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' : '') + '</svg>';
-  return h('section', { class:'journey', 'aria-label':'Your Journey · رحلتك' },
-    h('div', { class:'j-top' },
-      h('div', {},
-        h('p', { class:'j-lbl' }, h('bdi', { class:'en', dir:'ltr' }, 'From A2 to C1'), ' · من A2 إلى C1'),
-        h('p', { class:'j-big' }, h('span', { class:'en', dir:'ltr' }, 'Week ' + week + ' '), h('small', {}, '· الأسبوع ' + week + ' من 32'))),
-      h('button', { class:'ib light', type:'button', 'aria-label':'Progress & Skills Dashboard · لوحة التقدم والمهارات', on:{ click:openDashboard } }, ico('chart'))),
-    h('div', { class:'j-curve', 'aria-hidden':'true' }, h('span', { html:curve }),
-      h('span', { class:'j-dot', style:'left:calc(92% - 12px);top:54px;width:24px;height:24px;opacity:.25' }),
-      h('span', { class:'j-dot', style:'left:calc(92% - 6px);top:60px;width:12px;height:12px' }),
-      h('span', { class:'j-dot', style:'left:calc(53.1% - 3.5px);top:36.5px;width:7px;height:7px;opacity:.8' }),
-      h('span', { class:'j-dot', style:'left:calc(8.6% - 6px);top:6px;width:12px;height:12px;background:transparent;box-shadow:inset 0 0 0 2px #fff' }),
-      h('span', { class:'j-tag', style:'left:calc(8.6% + 12px);top:16px' }, 'B1'),
-      h('span', { class:'j-tag', style:'left:calc(53.1% - 8px);top:48px;opacity:.8;font-size:11px' }, 'A2')),
-    h('div', { class:'j-block' },
-      h('div', { class:'j-row' },
-        h('div', { class:'j-pct' }, h('b', {}, pr.pct + '%'), h('span', {}, pr.done === pr.total ? "Today's lesson done · اكتمل درس اليوم" : "Of today's lesson · من درس اليوم")),
-        h('button', { class:'ib sm light', type:'button', 'aria-label':'Open Lesson · افتح درس اليوم', on:{ click:function(){ go('lesson'); } } }, ico('fwd'))),
-      h('div', { class:'ticket' },
-        h('span', { class:'tk' }, h('b', { dir:'ltr' }, pr.done + '/' + pr.total), 'stages · مراحل'),
-        h('span', { class:'tk end' }, pr.mins ? [h('b', {}, pr.mins + ' د'), 'left · متبقية'] : [h('b', {}, 'Done · مكتمل')]),
-        h('span', { class:'notch t', 'aria-hidden':'true' }), h('span', { class:'notch b', 'aria-hidden':'true' }))));
+function unitList(u){ return (u === 0 ? D.unit0Lessons : D['unit' + u + 'Lessons']) || []; }
+function unitTitle(u){ if (u === 0) return 'Foundation Week'; var x = (D.units || []).filter(function(y){ return y.n === u; })[0]; return x ? x.en : 'Unit ' + u; }
+function a2LessonTotals(){
+  var total = 0;
+  [0].concat((D.units || []).map(function(u){ return u.n; })).forEach(function(u){
+    var n = unitList(u).filter(function(l){ return l && !l.test; }).length; total += n || 5; });
+  return { total:total, done:courseOrder().filter(isLessonDone).length };
 }
-var LESSON_ICON = ['', 'moon', 'clock', 'globe', 'mail', 'trophy'];
-var LESSON_SHORT = ['المضارع البسيط والمستمر', 'الأسئلة والإجابات القصيرة', 'كلمات التكرار', 'أفعال الحالة', 'إيميل مهني قصير', 'مراجعة الوحدة واختبارها'];
-/* LESSON_SHORT عناوين قصيرة لدروس الوحدة 1 بترتيبها (بديل قديم حين يغيب shortAr)، فلا تُعرض لدرس من وحدة أخرى. */
-function lessonCard(l, i){
-  var shortAr = l.shortAr || (unitOfLesson(l.id) === 1 && LESSON_SHORT[i]) || l.ar;
-  if (l.open) { var pr = lessonProgressOf(l.id);
-    var thumbNode = (!l.icon || l.icon === 'penguin') ? penguin(54, 76) : ico(l.icon || LESSON_ICON[i] || 'book');
-    var thumbStyle = (!l.icon || l.icon === 'penguin') ? '' : 'align-items:center;color:var(--dark)';
-    return h('button', { class:'lcard', type:'button', on:{ click:function(){ if (l.id) selectLesson(l.id); go('lesson'); } } },
-      h('span', { class:'l-thumb', style:thumbStyle, 'aria-hidden':'true' }, thumbNode),
-      h('span', { class:'l-body' },
-        h('span', { class:'l-title' }, l.en),
-        l.subEn ? h('span', { class:'l-sub-en' }, l.subEn) : null,
-        h('span', { class:'l-sub' }, h('span', { html:arHTML(shortAr) }), pr.done === pr.total ? h('span', { class:'chip-done' }, 'Done · مكتمل') : h('span', { class:'chip-now' }, 'Now · الآن'))),
-      h('span', { class:'l-go', 'aria-hidden':'true' }, ico('chev'))); }
-  return h('div', { class:'lcard locked' },
-    h('span', { class:'l-thumb', 'aria-hidden':'true' }, ico(l.icon || LESSON_ICON[i] || 'lock')),
-    h('span', { class:'l-body' },
-      h('span', { class:'l-title' }, l.en),
-      l.subEn ? h('span', { class:'l-sub-en' }, l.subEn) : null,
-      h('span', { class:'l-sub', html:arHTML(shortAr) + ' · Soon · قريبًا' })),
-    h('span', { class:'l-go', 'aria-hidden':'true' }, ico('lock')));
+function activePatternCount(){ return sortedErrorLabCats().filter(function(c){ var s = G.errorLab[c.key]; return s && (s.count || 0) > (s.solved || 0); }).length; }
+function journeyCard(){
+  var st = computeDashboardStats(), tot = a2LessonTotals(), u = unitOfLesson(curLessonId);
+  var lessons = unitList(u).filter(function(l){ return l && !l.test; }), me = lessons.filter(function(l){ return l.id === curLessonId; })[0];
+  var a2Pct = tot.total ? Math.round(tot.done / tot.total * 100) : 0;
+  var stages = [['A2', 'now'], ['B1', ''], ['B2', ''], ['C1', 'IELTS']];
+  function stat(v, l){ return h('div', { class:'jr-stat' }, h('b', { dir:'ltr' }, v), h('span', {}, l)); }
+  return h('section', { class:'jr', 'aria-label':'Your journey' },
+    h('div', { class:'jr-top' },
+      h('span', { class:'jr-lbl' }, 'Your journey'),
+      h('button', { class:'jr-more', type:'button', on:{ click:openDashboard } }, ico('chart'), 'Progress')),
+    h('div', { class:'jr-track', role:'img', 'aria-label':'You are in stage A2. Next come B1, B2 and C1.' }, stages.map(function(s, i){
+      return h('div', { class:'jr-seg' + (i === 0 ? ' on' : '') },
+        h('span', { class:'jr-bar' }, i === 0 ? h('i', { style:'width:' + Math.max(4, a2Pct) + '%' }) : null),
+        h('span', { class:'jr-st' }, s[0] + (s[1] ? ' · ' + s[1] : ''))); })),
+    h('p', { class:'jr-place' }, (u === 0 ? '' : 'Unit ' + u + ' · ') + unitTitle(u)),
+    h('p', { class:'jr-sub' }, me ? 'Lesson ' + me.n + ' of ' + lessons.length : 'Your current lesson'),
+    h('div', { class:'jr-stats' },
+      stat(tot.done + '/' + tot.total, 'A2 lessons'),
+      stat(st.hoursStr + '/' + st.a2TargetHrs + 'h', 'Study hours'),
+      stat(String(activePatternCount()), 'Mistakes to fix')));
 }
-function quickToolsRow(){
-  var st = computeDashboardStats();
-  return h('div', { class:'quick-grid' },
-    h('button', { class:'qtile', type:'button', on:{ click:openDashboard } },
-      h('div', { class:'qtile-top' },
-        h('span', { class:'qtile-ic' }, ico('chart')),
-        h('span', { class:'qtile-badge' }, st.hoursStr + ' / ' + st.a2TargetHrs + 'h A2')),
-      biNode('Progress & 4 Skills', 'لوحة التقدم والمهارات')),
-    h('button', { class:'qtile exp', type:'button', on:{ click:function(){ openSession('express'); } } },
-      h('div', { class:'qtile-top' },
-        h('span', { class:'qtile-ic' }, ico('clock')),
-        h('span', { class:'qtile-badge' }, '15 min · ' + (G.expressSessions || 0) + ' done')),
-      biNode('Busy-Day Express Mode', 'الوضع المختصر (١٥ دقيقة)')));
+function firstSentence(s){ s = String(s || ''); var m = /^(.+?[.!?])(\s|$)/.exec(s); return m ? m[1] : s; }
+function todayLesson(){
+  var pr = lessonProgress(), cur = pr.next, u = unitOfLesson(curLessonId);
+  var me = unitList(u).filter(function(l){ return l && l.id === curLessonId; })[0] || {};
+  var done = pr.done === pr.total, nextId = done ? nextIncomplete(curLessonId) : null;
+  var head = h('div', { class:'td-head' },
+    h('div', { class:'td-txt' },
+      h('p', { class:'td-lbl' }, (u === 0 ? 'Foundation Week' : 'Unit ' + u) + (me.n ? ' · Lesson ' + me.n : '')),
+      h('h1', { class:'td-title' }, D.en || me.en || ''),
+      h('p', { class:'td-sub' }, String(D.subEn || me.subEn || '').replace(/^Foundation \d+ · /, '') + (pr.mins ? ' · ' + pr.mins + ' min' + (pr.done ? ' left' : '') : ''))),
+    penguin(54, 77, 'td-peng'));
+  var doneCard = done ? h('div', { class:'tp-donecard' },
+    h('b', {}, 'Lesson complete'),
+    h('p', {}, nextId ? 'Your next lesson is ready.' : 'You finished every lesson built so far.'),
+    h('div', { class:'tp-acts' },
+      nextId ? h('button', { class:'btn sm', type:'button', on:{ click:function(){ selectLesson(nextId); render(); } } }, 'Next lesson', ico('fwd')) : null,
+      h('button', { class:'btn sm light', type:'button', on:{ click:function(){ openPart('recall'); } } }, 'Review from start'))) : null;
+  var path = h('ol', { class:'tpath' }, PARTS.map(function(p, i){
+    var isDone = !!S.stamps[p.k], isCur = !!cur && cur.k === p.k, info = (D.intro && D.intro[p.k]) || {};
+    if (isCur) return h('li', { class:'tp cur' },
+      h('span', { class:'tp-n' }, String(i + 1)),
+      h('div', { class:'tp-card' },
+        h('div', { class:'tp-row' }, h('b', {}, p.fullEn), h('span', {}, p.min + ' min')),
+        info.dEn ? h('p', { class:'tp-line' }, firstSentence(info.dEn)) : null,
+        h('button', { class:'btn pstep cur', type:'button', on:{ click:function(){ openPart(p.k); } } }, pr.done ? 'Continue' : 'Start', ico('fwd'))));
+    return h('li', { class:'tp' + (isDone ? ' done' : '') },
+      h('button', { class:'tp-btn pstep' + (isDone ? ' done' : ''), type:'button', 'aria-label':p.fullEn + (isDone ? ', done' : ''), on:{ click:function(){ openPart(p.k); } } },
+        h('span', { class:'tp-n' }, isDone ? ico('check') : String(i + 1)),
+        h('span', { class:'tp-name' }, p.fullEn),
+        h('span', { class:'tp-min' }, isDone ? 'Done' : p.min + ' min')));
+  }));
+  return [head, doneCard, path];
 }
-function foundationWeekBox(){
-  if (!D.unit0Lessons || !D.unit0Lessons.length) return null;
-  return h('div', { class:'u0-box', style:'border-radius:20px;border:1.5px solid var(--line-dark);background:var(--surface);overflow:hidden' },
-    h('div', { class:'uo-head' },
-      h('span', { class:'u-n' }, '0'),
-      h('span', { class:'u-t' },
-        h('span', { class:'uo-en' }, 'Foundation Week · Unit 0'),
-        h('b', { class:'u-ar' }, 'الأسبوع التأسيسي قبل الوحدة 1'),
-        h('span', { html:'<bdi class="en">be &amp; do · Agreement · was/were · Capitals &amp; Spelling</bdi> · أساسيات القواعد والإملاء' }))),
-    h('ol', { class:'uo-list' }, D.unit0Lessons.map(function(l){
-      var k = 'F' + l.n;
-      var pr = lessonProgressOf(l.id);
-      if (l.open) return h('li', {}, h('button', { class:'uo-row u0-row', type:'button', on:{ click:function(){ if (l.id) selectLesson(l.id); go('lesson'); } } },
-        h('span', { class:'uo-k' }, k),
-        h('span', { class:'uo-t' }, h('b', {}, l.en), h('span', { html:(l.subEn ? '<bdi class="en">' + esc(l.subEn) + '</bdi> · ' : '') + arHTML(l.ar) })),
-        h('span', { class:pr.done === pr.total ? 'chip-done' : 'chip-now' }, pr.done === pr.total ? 'Done · مكتمل' : 'Now · الآن')));
-      return h('li', {}, h('div', { class:'uo-row u0-row' },
-        h('span', { class:'uo-k' }, k),
-        h('span', { class:'uo-t' }, h('b', {}, l.en), h('span', { html:(l.subEn ? '<bdi class="en">' + esc(l.subEn) + '</bdi> · ' : '') + arHTML(l.ar) })),
-        h('span', { class:'u-lock', html:IC.lock })));
-    }), unitTestRow(0, null)));
+/* اختبار الوحدة يظهر في الرئيسية حين يُفتح (بعد اكتمال دروس الوحدة)، والاختبار المصغر حين يستحق. */
+function unitTestBanner(){
+  var u = unitOfLesson(curLessonId), ut = unitTestOf(u);
+  if (!ut || !unitLessonsDone(u)) return null;
+  var st = (G.unitTests && G.unitTests[u]) || {};
+  if (st.status === 'mastered' && !st.miniQuizDue) return null;
+  var name = u === 0 ? 'Foundation Week test' : 'Unit ' + u + ' test';
+  return h('div', { class:'tbanner' },
+    h('span', { class:'tb-ic' }, ico('trophy')),
+    h('div', { class:'tb-t' },
+      h('b', {}, st.miniQuizDue ? 'Mini follow-up quiz is due' : st.status ? name + ': aim for mastery' : name + ' is ready'),
+      h('span', {}, ut.legalCorner ? 'Includes the legal corner' : 'Questions you have not seen before')),
+    h('button', { class:'btn sm', type:'button', on:{ click:function(){ openSession((st.miniQuizDue ? 'unitMini:' : 'unitTest:') + u); } } }, 'Open'));
 }
-/* سطر اختبار الوحدة في قائمة دروسها: مقفل حتى تُبنى دروس الوحدة كلها وتكتمل، ثم يفتح جلسة unitTest:<u>.
-   ولا يظهر سطر للأسبوع التأسيسي ما دام D.unitTests[0] غير موجود. */
+function todayTools(){
+  return h('div', { class:'tools' },
+    h('button', { class:'tool', type:'button', on:{ click:function(){ openSession('express'); } } }, ico('clock'), h('span', {}, 'Express 15 min')),
+    h('button', { class:'tool', type:'button', on:{ click:openCambly } }, ico('chat'), h('span', {}, 'Cambly card')),
+    SAMPLE
+      ? h('button', { class:'tool', type:'button', on:{ click:openAsk } }, ico('help'), h('span', {}, 'Ask the teacher'))
+      : h('button', { class:'tool', type:'button', on:{ click:openAbout } }, ico('dots'), h('span', {}, 'About lesson')));
+}
+function vHome(){
+  return h('section', { class:'scr gut today' }, header(), journeyCard(), todayLesson(), unitTestBanner(), todayTools());
+}
+function vLesson(){ return vHome(); }
+
+/* ---------- course: units as one journey line, with unit tests and pre-tests ---------- */
+function stageTrack(){
+  var stages = [['A2', 'now'], ['B1', ''], ['B2', ''], ['C1', 'IELTS']];
+  return h('div', { class:'jr-track light', role:'img', 'aria-label':'You are in stage A2. Next come B1, B2 and C1.' }, stages.map(function(s, i){
+    return h('div', { class:'jr-seg' + (i === 0 ? ' on' : '') }, h('span', { class:'jr-bar' }), h('span', { class:'jr-st' }, s[0] + (s[1] ? ' · ' + s[1] : ''))); }));
+}
+/* سطر اختبار الوحدة: مقفل حتى تُبنى دروس الوحدة كلها وتكتمل، ثم يفتح جلسة unitTest:<u>.
+   ولا يظهر سطر للأسبوع التأسيسي ما دام D.unitTests[0] غير موجود. وأسماء الأصناف u0-test وu-test يعتمدها الاختبار الشامل. */
 function unitTestRow(u, l){
   var ut = unitTestOf(u);
   if (!ut && !l) return null;
   var st = (G.unitTests && G.unitTests[u]) || {}, open = !!ut && unitLessonsDone(u);
-  var N = ut && ut.questions ? ut.questions.length : 0, mPct = (ut && ut.masteryPct) || 90, pPct = (ut && ut.passPct) || 80;
-  var sub = (l ? (l.subEn ? '<bdi class="en">' + esc(l.subEn) + '</bdi> · ' : '') + arHTML(l.ar) : arHTML(ut.titleAr || ''))
-    + (ut && ut.legalCorner ? ' · الركن القانوني' : '') + (N ? ' + ' + arQs(N) : '');
-  var cls = 'uo-row ' + (u === 0 ? 'u0-test' : 'u-test');
-  var body = [h('span', { class:'uo-k' }, 'TEST'),
-    h('span', { class:'uo-t' }, h('b', {}, l ? l.en : ut.titleEn), h('span', { html:sub }), open ? null : h('span', { class:'u-lock-t', html:arHTML(unitLockText(u)) }))];
-  if (!open) return h('li', {}, h('div', { class:cls + ' locked', 'aria-disabled':'true' }, body, h('span', { class:'u-lock', html:IC.lock })));
-  var chip = st.status === 'mastered' ? 'Mastered ' + mPct + '%+ · متقن' : st.status === 'passed' ? 'Passed ' + pPct + '%+ · عابر' : mPct + '% Mastery / ' + pPct + '% Pass';
+  var mPct = (ut && ut.masteryPct) || 90, pPct = (ut && ut.passPct) || 80;
+  var title = (l && l.en) || (ut && ut.titleEn) || 'Unit test';
+  var cls = 'cl-row ' + (u === 0 ? 'u0-test' : 'u-test');
+  var sub = open ? (st.status === 'mastered' ? 'Mastered (' + mPct + '%+)' : st.status === 'passed' ? 'Passed (' + pPct + '%+). Aim for ' + mPct + '%' : 'Goal ' + mPct + '% · pass ' + pPct + '%') + (ut && ut.legalCorner ? ' · legal corner' : '')
+    : 'Opens after the unit lessons';
+  var body = [h('span', { class:'cl-n' + (open ? '' : ' lk') }, open ? ico('trophy') : ico('lock')), h('span', { class:'cl-t' }, h('b', {}, title), h('small', {}, sub))];
+  if (!open) return h('li', {}, h('div', { class:cls + ' locked', 'aria-disabled':'true' }, body));
   return h('li', {},
-    h('button', { class:cls, type:'button', on:{ click:function(){ openSession('unitTest:' + u); } } }, body, h('span', { class:st.status ? 'chip-done' : 'chip-now' }, chip)),
-    st.miniQuizDue ? h('button', { class:'btn sm out', type:'button', style:'margin:4px 10px 6px;width:calc(100% - 20px)', on:{ click:function(){ openSession('unitMini:' + u); } } },
-      ico('review'), biBtn('Next-Week Mini Follow-Up Quiz (80–89% Errors)', 'الاختبار المصغر لأخطاء الوحدة (لرفع الإتقان إلى ٩٠٪)')) : null);
+    h('button', { class:cls, type:'button', on:{ click:function(){ openSession('unitTest:' + u); } } }, body, h('span', { class:st.status ? 'chip-done' : 'chip-now' }, st.status ? (st.status === 'mastered' ? 'Mastered' : 'Passed') : 'Open')),
+    st.miniQuizDue ? h('button', { class:'btn sm out cl-mini', type:'button', on:{ click:function(){ openSession('unitMini:' + u); } } }, ico('review'), 'Mini follow-up quiz') : null);
 }
-/* الوحدة الحالية في الرئيسية (عنوان دروسها وبطاقاتها وبلاطة اختبارها): وحدة درس اليوم (G.cur) إن كانت وحدة مرقّمة
-   (1 فأكثر) لها قائمة دروس، وإلا (كدرس من الأسبوع التأسيسي) أول وحدة مفتوحة في D.units لها قائمة ولم تكتمل دروسها،
-   وإلا الوحدة 1. فتظهر الوحدة 2 وما بعدها حين تُضاف قائمة دروسها إلى content.js، بلا تعديل هنا. */
 function unitHasList(u){ var list = D['unit' + u + 'Lessons']; return Array.isArray(list) && list.length > 0; }
 function currentUnit(){
   var u = unitOfLesson(G.cur || curLessonId);
@@ -645,193 +654,69 @@ function currentUnit(){
   var next = (D.units || []).filter(function(x){ return x && x.open && x.n >= 1 && unitHasList(x.n) && !unitLessonsDone(x.n); })[0];
   return next ? next.n : 1;
 }
-function vHome(){
-  var cu = currentUnit();
-  return h('section', { class:'scr gut' }, header(),
-    h('h1', { class:'h1 bi-h' }, h('span', { class:'en', dir:'ltr' }, 'Your Journey'), h('small', {}, 'رحلتك')),
-    journeyCard(),
-    quickToolsRow(),
-    stage4ToolsRow(),
-    foundationWeekBox(),
-    h('div', { class:'sec-h' },
-      h('h2', { class:'bi-h' }, h('span', { class:'en', dir:'ltr' }, 'Unit ' + cu + ' Lessons'), h('small', {}, 'دروس الوحدة ' + cu)),
-      h('button', { class:'link', type:'button', on:{ click:function(){ go('lessons'); } } }, 'See all · عرض الكل')),
-    h('div', { class:'lcards' }, (D['unit' + cu + 'Lessons'] || []).slice(0, 3).map(lessonCard)));
+function preTestBox(u){
+  if (!(D.preTests && D.preTests[u.n])) return null;
+  var rec = ptRecValid(u.n), first = rec && rec.first, pct = first ? ptPct(first.sc, first.n) : 0, exempt = !!(first && ptExemptOK(first.sc, first.n));
+  return h('div', { class:'cl-pre' },
+    h('span', { class:exempt ? 'exempt-chip' : 'pre-chip' }, exempt ? 'Exempted (' + pct + '%) · it returns in the review week' : first ? 'First attempt: ' + pct + '% · you study it when you get there' : 'Pre-Test Available · the first attempt decides'),
+    h('button', { class:'btn sm' + (first ? ' out' : ''), type:'button', on:{ click:function(){ openSession('pretest:' + u.n); } } }, first ? 'Practice' : 'Pre-Test', ico('fwd')));
 }
-function stage4ToolsRow(){
-  var u = currentUnit();
-  var ut = (G.unitTests && G.unitTests[u]) || {}, tu = unitTestOf(u), openU = !!tu && unitLessonsDone(u);
-  var Nu = (tu && tu.questions && tu.questions.length) || 20, mu = (tu && tu.masteryPct) || 90, pu = (tu && tu.passPct) || 80;
-  var utBadge = ut.best != null ? (Math.round(ut.best / Nu * 100) + '% · ' + (ut.status === 'mastered' ? 'Mastered' : ut.status === 'passed' ? 'Passed' : 'Retry')) : Nu + ' Qs · ' + mu + '% / ' + pu + '%';
-  var cLogs = (G.camblyLogs || []).length;
-  var cBadge = cLogs ? (cLogs + ' session(s)') : '1st: Speaking Check';
-  var utTitle = biNode('Unit ' + u + ' Test & Legal Corner', 'اختبار الوحدة ' + arDigits(u) + ' والركن القانوني');
-  /* اختبار الوحدة الحالية مقفل حتى تُبنى دروسها كلها وتكتمل، فلا يُختبر المتعلم فيما لم يدرسه. */
-  var utTile = openU
-    ? h('button', { class:'qtile', type:'button', on:{ click:function(){ openSession('unitTest:' + u); } } },
-        h('div', { class:'qtile-top' },
-          h('span', { class:'qtile-ic' }, ico('trophy')),
-          h('span', { class:'qtile-badge' }, utBadge)),
-        utTitle)
-    : h('div', { class:'qtile locked', 'aria-disabled':'true', style:'cursor:default;border-color:var(--line)' },
-        h('div', { class:'qtile-top' },
-          h('span', { class:'qtile-ic', style:'background:var(--gray-3);color:var(--muted)' }, ico('lock')),
-          h('span', { class:'qtile-badge' }, utBadge)),
-        utTitle,
-        h('small', { class:'muted sm u-lock-t', html:arHTML(unitLockText(u)) }));
-  return h('div', { class:'quick-grid' },
-    h('button', { class:'qtile', type:'button', on:{ click:openCambly } },
-      h('div', { class:'qtile-top' },
-        h('span', { class:'qtile-ic' }, ico('speaker')),
-        h('span', { class:'qtile-badge' }, cBadge)),
-      biNode('Cambly Card & Session Log', 'بطاقة كامبلي وسجل الجلسة')),
-    utTile);
+function unitNode(u, openN){
+  var isOpen = u.n === 0 || !!u.open, list = unitList(u.n), lessons = list.filter(function(l){ return l && !l.test; });
+  var doneN = lessons.filter(function(l){ return l.open && l.id && isLessonDone(l.id); }).length;
+  var sub = (u.gEn || '') + (isOpen ? ' · ' + lessons.length + ' lessons' : ' · coming soon');
+  var node = h('span', { class:'u-n' + (isOpen ? '' : ' lk') }, String(u.n));
+  function toggle(){ G.ui.openUnit = openN === u.n ? -1 : u.n; saveLocal(); render(); }
+  if (!isOpen) return h('li', { class:'tl-it' + (D.preTests && D.preTests[u.n] ? ' u-card-wrap' : '') },
+    node, h('div', { class:'tl-main' }, h('div', { class:'tl-row locked' }, h('span', { class:'tl-t' }, h('b', {}, u.en), h('small', {}, sub)), ico('lock')), preTestBox(u)));
+  if (openN !== u.n) return h('li', { class:'tl-it' }, node,
+    h('button', { class:'tl-row', type:'button', 'aria-expanded':'false', on:{ click:toggle } },
+      h('span', { class:'tl-t' }, h('b', {}, u.en), h('small', {}, sub)),
+      h('span', { class:'tl-prog' }, doneN + '/' + lessons.length), ico('down')));
+  var rows = list.map(function(l){
+    if (l.test) return unitTestRow(u.n, l);
+    var done = l.open && l.id && isLessonDone(l.id), isNext = l.id === curLessonId && !done;
+    if (!l.open) return h('li', {}, h('div', { class:'cl-row locked' }, h('span', { class:'cl-n lk' }, ico('lock')), h('span', { class:'cl-t' }, h('b', {}, l.en), h('small', {}, 'Coming soon'))));
+    return h('li', {}, h('button', { class:'cl-row' + (isNext ? ' next' : ''), type:'button', on:{ click:function(){ if (l.id) selectLesson(l.id); go('home'); } } },
+      h('span', { class:'cl-n' + (done ? ' ok' : '') }, done ? ico('check') : String(l.n)),
+      h('span', { class:'cl-t' }, h('b', {}, l.en), l.subEn ? h('small', {}, l.subEn) : null),
+      isNext ? h('span', { class:'chip-next' }, 'Next') : done ? null : ico('chev')));
+  });
+  if (u.n === 0 && !list.some(function(l){ return l && l.test; })) rows.push(unitTestRow(0, null));
+  return h('li', { class:'tl-it open' }, h('span', { class:'u-n on' }, String(u.n)),
+    h('div', { class:'tl-card' },
+      h('button', { class:'tl-head', type:'button', 'aria-expanded':'true', on:{ click:toggle } },
+        h('span', { class:'tl-t' }, h('b', {}, u.en), h('small', {}, u.gEn || '')),
+        h('span', { class:'tl-prog' }, doneN + '/' + lessons.length), ico('up')),
+      h('ol', { class:'cl-list' }, rows)));
 }
-
-/* ---------- lessons tab (with Unit Test 90%/80% & Pre-Tests for Units 5, 8, 9, 12) ---------- */
 function vLessons(){
-  return h('section', { class:'scr gut' },
-    h('div', { class:'pg-h' },
-      h('h1', { class:'h1 bi-h' }, h('span', { class:'en', dir:'ltr' }, 'Course Lessons'), h('small', {}, 'الدروس')),
-      h('p', { class:'muted' }, biNode('From Early A2 to C1 & IELTS for Study and Work', 'من بداية A2 إلى C1 للدراسة والعمل'))),
-    h('div', { class:'stages' }, D.stages.map(function(s){ var on = s.status === 'current';
-      return h('div', { class:'stage' + (on ? ' on' : '') }, h('b', {}, s.code), h('span', {}, on ? 'Now · 12 Units · الآن' : (s.code === 'B1' ? 'Next · 20 Units · بعدها' : 'Academic & IELTS · أكاديمي'))); })),
-    h('div', { class:'sec-h' },
-      h('h2', { class:'bi-h' }, h('span', { class:'en', dir:'ltr' }, 'Stage A2 Units'), h('small', { html:'الأسبوع التأسيسي + وحدات المرحلة ' + arHTML('A2') })),
-      h('span', { class:'muted sm' }, '1 Unit / Week · وحدة كل أسبوع')),
-    foundationWeekBox(),
-    h('div', { class:'units' }, D.units.map(function(u){
-      /* كل وحدة مفتوحة تعرض قائمتها هي (unit<n>Lessons) وسطر اختبارها، لا قائمة الوحدة 1. */
-      if (u.open) return h('div', { class:'unit-open' },
-        h('div', { class:'uo-head' }, h('span', { class:'u-n' }, String(u.n)),
-          h('span', { class:'u-t' }, h('span', { class:'uo-en' }, u.en), h('b', { class:'u-ar' }, u.ar), h('span', { html:(u.gEn ? '<bdi class="en">' + esc(u.gEn) + '</bdi> · ' : '') + arHTML(u.g) }))),
-        h('ol', { class:'uo-list' }, (D['unit' + u.n + 'Lessons'] || []).map(function(l){
-          var k = l.test ? 'TEST' : ('L' + l.n);
-          var pr = lessonProgressOf(l.id);
-          if (l.open) return h('li', {}, h('button', { class:'uo-row', type:'button', on:{ click:function(){ if (l.id) selectLesson(l.id); go('lesson'); } } }, h('span', { class:'uo-k' }, k), h('span', { class:'uo-t' }, h('b', {}, l.en), h('span', { html:(l.subEn ? '<bdi class="en">' + esc(l.subEn) + '</bdi> · ' : '') + arHTML(l.ar) })), h('span', { class:'chip-now' }, pr.done === pr.total ? 'Done · مكتمل' : 'Now · الآن')));
-          if (l.test) return unitTestRow(u.n, l);
-          return h('li', {}, h('div', { class:'uo-row' }, h('span', { class:'uo-k' }, k), h('span', { class:'uo-t' }, h('b', {}, l.en), h('span', { html:(l.subEn ? '<bdi class="en">' + esc(l.subEn) + '</bdi> · ' : '') + arHTML(l.ar) })), h('span', { class:'u-lock', html:IC.lock })));
-        })));
-      var hasPre = !!(D.preTests && D.preTests[u.n]);
-      /* السجل الصالح وحده (إصداره يطابق إصدار الاختبار)، والمحاولة الأولى وحدها تقرر الإعفاء. */
-      var preRec = ptRecValid(u.n), preFirst = preRec && preRec.first;
-      var prePct = preFirst ? ptPct(preFirst.sc, preFirst.n) : 0;
-      var preExempt = !!(preFirst && ptExemptOK(preFirst.sc, preFirst.n));
-      if (!hasPre) {
-        return h('div', { class:'unit' }, h('span', { class:'u-n' }, String(u.n)),
-          h('span', { class:'u-t' }, h('b', {}, u.en), h('span', { class:'u-ar' }, u.ar), h('span', { html:(u.gEn ? '<bdi class="en">' + esc(u.gEn) + '</bdi> · ' : '') + arHTML(u.g) })),
-          h('span', { class:'u-lock', html:IC.lock, 'aria-label':'Soon · قريبًا' }));
-      }
-      return h('div', { class:'u-card-wrap unit' },
-        h('div', { class:'u-card-top', style:'width:100%' },
-          h('span', { class:'u-n' }, String(u.n)),
-          h('span', { class:'u-t' }, h('b', {}, u.en), h('span', { class:'u-ar' }, u.ar), h('span', { html:(u.gEn ? '<bdi class="en">' + esc(u.gEn) + '</bdi> · ' : '') + arHTML(u.g) })),
-          h('span', { class:'u-lock', html: preExempt ? IC.check : IC.lock, 'aria-label':'Pre-Test available · متاح للاختبار القبلي' })),
-        h('div', { class:'u-card-foot', style:'width:100%' },
-          preExempt
-            ? h('span', { class:'exempt-chip' }, 'Exempted (' + prePct + '%) · معفى منها (تعود في أسبوع التثبيت)')
-            : h('span', { class:'pre-chip' }, preFirst ? ('First attempt: ' + prePct + '% · المحاولة الأولى ' + arDigits(prePct) + '٪ — تدرسها عند الوصول إليها') : 'Pre-Test Available · اختبار قبلي (المحاولة الأولى تقرر الإعفاء)'),
-          h('button', { class:'btn sm' + (preExempt ? ' out' : ''), type:'button', on:{ click:function(){ openSession('pretest:' + u.n); } } },
-            preFirst ? biBtn('Practice', 'تدريب') : biBtn('Pre-Test', 'اختبار قبلي'), ico('fwd'))));
-    })));
+  var openN = G.ui.openUnit != null && G.ui.openUnit !== '' ? Number(G.ui.openUnit) : unitOfLesson(curLessonId);
+  var all = [{ n:0, en:'Foundation Week', gEn:'be and do · was and were · agreement', open:true }].concat(D.units || []);
+  var lastOpen = all.filter(function(u){ return u.n === 0 || u.open; }).map(function(u){ return u.n; }).pop() || 0;
+  var cut = lastOpen + 3, showAll = !!G.ui.allUnits;
+  var shown = showAll ? all : all.filter(function(u){ return u.n <= cut; }), rest = all.filter(function(u){ return u.n > cut; });
+  var restPre = rest.filter(function(u){ return D.preTests && D.preTests[u.n]; }).length;
+  return h('section', { class:'scr gut course' },
+    h('div', { class:'pg-top' },
+      h('h1', { class:'h1' }, 'Course'),
+      h('button', { class:'pill-btn', type:'button', on:{ click:openDashboard } }, ico('chart'), 'Progress')),
+    stageTrack(),
+    h('ol', { class:'tl' }, shown.map(function(u){ return unitNode(u, openN); }),
+      (!showAll && rest.length) ? h('li', { class:'tl-it' }, h('span', { class:'u-n lk' }, '+'),
+        h('button', { class:'tl-row', type:'button', on:{ click:function(){ G.ui.allUnits = true; saveLocal(); render(); } } },
+          h('span', { class:'tl-t' }, h('b', {}, 'Units ' + rest[0].n + ' to ' + rest[rest.length - 1].n), h('small', {}, rest.length + ' units' + (restPre ? ' · ' + restPre + ' pre-test' + (restPre > 1 ? 's' : '') + ' available' : ''))), ico('down'))) : null));
 }
 
-/* ---------- words tab (Lesson Phrases + 60 Irregular Verbs in Spaced Repetition) ---------- */
+/* ---------- practice: mistakes, lesson phrases and irregular verbs together ---------- */
 var POS_AR = { noun:'اسم', verb:'فعل', adjective:'صفة', adverb:'ظرف', 'legal phrase':'عبارة قانونية' };
 function irrStatus(base){
   var st = G.irrSr && G.irrSr[base];
-  if (!st || !st.box) return { st:'new', lbl:'New · جديد', due:true, days:0 };
+  if (!st || !st.box) return { st:'new', lbl:'New', due:true, days:0 };
   var due = !st.nextAt || Date.now() >= st.nextAt;
   var d = SR_DAYS[Math.min(SR_DAYS.length - 1, st.box - 1)];
-  return { st: st.box >= 3 ? 'k' : 'r', lbl: due ? ('Due · مستحق (+' + d + 'd)') : ('+' + d + 'd · بعد ' + d + ' يوم'), due:due, days:d, box:st.box };
+  return { st: st.box >= 3 ? 'k' : 'r', lbl: due ? ('Due (+' + d + 'd)') : ('In ' + d + 'd'), due:due, days:d, box:st.box };
 }
-function vWords(){
-  var tab = G.ui.wordsTab || 'vocab';
-  var switcher = h('div', { class:'seg', role:'tablist', 'aria-label':'Words View · عرض الكلمات' },
-    h('button', { class:'seg-b' + (tab === 'vocab' ? ' on' : ''), type:'button', role:'tab', 'aria-selected':tab === 'vocab' ? 'true' : 'false', on:{ click:function(){ G.ui.wordsTab = 'vocab'; saveLocal(); render(); } } },
-      h('span', { class:'en' }, 'Lesson Phrases (' + ALL_VOCAB.length + ')'),
-      h('small', {}, 'عبارات الدرس والعبارة القانونية')),
-    h('button', { class:'seg-b' + (tab === 'irregular' ? ' on' : ''), type:'button', role:'tab', 'aria-selected':tab === 'irregular' ? 'true' : 'false', on:{ click:function(){ G.ui.wordsTab = 'irregular'; saveLocal(); render(); } } },
-      h('span', { class:'en' }, 'Irregular Verbs (' + (D.irregularVerbs || []).length + ')'),
-      h('small', {}, 'الأفعال الشاذة · التكرار المتباعد')));
-
-  if (tab === 'irregular') {
-    var verbs = D.irregularVerbs || [];
-    var mastered = 0, learning = 0, dueCnt = 0;
-    verbs.forEach(function(v){
-      var s = irrStatus(v.base);
-      if (s.st === 'k') mastered++;
-      else if (s.st === 'r') learning++;
-      if (s.due) dueCnt++;
-    });
-    var curG = G.ui.irrGroup || 'all';
-    var filtered = curG === 'all' ? verbs : verbs.filter(function(v){ return v.g === curG; });
-    return h('section', { class:'scr gut' },
-      h('div', { class:'pg-h' },
-        h('h1', { class:'h1 bi-h' }, h('span', { class:'en', dir:'ltr' }, '60 Common Irregular Verbs'), h('small', {}, 'قائمة الـ 60 فعلًا شاذًا في التكرار المتباعد')),
-        h('p', { class:'muted' }, biNode('Grouped by sound pattern (+1d → +3d → +7d → +30d spaced schedule).', 'مقسّمة بالأنماط الصوتية لتثبيت التصريف الثاني والثالث بالتكرار المتباعد.'))),
-      switcher,
-      h('div', { class:'wsum' },
-        h('div', { class:'wstat' }, h('b', {}, String(mastered)), h('span', {}, 'Mastered · متقنة')),
-        h('div', { class:'wstat' }, h('b', {}, String(learning)), h('span', {}, 'In Spaced Rep · بالتثبيت')),
-        h('div', { class:'wstat' }, h('b', {}, String(dueCnt)), h('span', {}, 'Due Now · مستحقة'))),
-      h('button', { class:'btn', type:'button', on:{ click:function(){ openSession('irregular'); } } },
-        ico('pen'), biBtn('Practice Irregular Verbs (Type from Memory)', 'تدرّب على الأفعال الشاذة كتابةً من الذاكرة')),
-      h('div', { class:'pills' }, (D.irregularGroups || []).map(function(g){
-        return h('button', { class:'pill-b' + (curG === g.k ? ' on' : ''), type:'button', on:{ click:function(){ G.ui.irrGroup = g.k; saveLocal(); render(); } } }, g.en + ' · ' + g.ar);
-      })),
-      h('div', { class:'wlist' }, filtered.map(function(v){
-        var st = irrStatus(v.base);
-        return h('details', { class:'wrow' },
-          h('summary', {},
-            h('span', { class:'w-st' + (st.st !== 'new' ? ' ' + st.st : ''), 'aria-hidden':'true' }),
-            h('span', { class:'w-en' },
-              h('b', {}, v.base + ' → ' + v.past + ' → ' + v.pp),
-              h('span', {}, v.ar + ' · ' + st.lbl)),
-            oxBtn(v.base),
-            sayBtn(v.base, 'Human Pronunciation · نطق بشري ' + v.base)),
-          h('div', { class:'w-more' },
-            h('div', { class:'irr-forms' },
-              h('div', { class:'irr-f' }, h('small', {}, 'Base · المضارع'), h('b', {}, v.base)),
-              h('div', { class:'irr-f' }, h('small', {}, 'Past · الماضي'), h('b', {}, v.past)),
-              h('div', { class:'irr-f' }, h('small', {}, 'Participle · الثالث'), h('b', {}, v.pp))),
-            h('p', { class:'muted sm' }, 'Spaced Repetition interval · مرحلة التكرار المتباعد: ' + st.lbl)));
-      })));
-  }
-
-  var k = 0, r = 0;
-  ALL_VOCAB.forEach(function(v){ if (S.cards[v.en] === 'k') k++; else if (S.cards[v.en] === 'r') r++; });
-  var n = ALL_VOCAB.length - k - r;
-  return h('section', { class:'scr gut' },
-    h('div', { class:'pg-h' },
-      h('h1', { class:'h1 bi-h' }, h('span', { class:'en', dir:'ltr' }, 'Vocabulary & Legal Phrases'), h('small', {}, 'الكلمات والعبارات القانونية')),
-      h('p', { class:'muted' }, D.vocab.length + ' lesson words + 1 legal phrase · ' + D.vocab.length + ' كلمة + عبارة قانونية')),
-    switcher,
-    h('div', { class:'wsum' },
-      h('div', { class:'wstat' }, h('b', {}, String(k)), h('span', {}, 'Known · أعرفها')),
-      h('div', { class:'wstat' }, h('b', {}, String(r)), h('span', {}, 'Review · للمراجعة')),
-      h('div', { class:'wstat' }, h('b', {}, String(n)), h('span', {}, 'New · جديدة'))),
-    h('button', { class:'btn', type:'button', on:{ click:function(){ openSession('cards'); } } }, ico('cards'),
-      r ? biBtn('Review Hard Words (' + r + ')', 'راجع الكلمات الصعبة (' + r + ')') : biBtn('Review Flashcards', 'راجع البطاقات')),
-    h('div', { class:'wlist' }, ALL_VOCAB.map(function(v){ var st = S.cards[v.en];
-      return h('details', { class:'wrow' },
-        h('summary', {}, h('span', { class:'w-st' + (st ? ' ' + st : ''), 'aria-hidden':'true' }),
-          h('span', { class:'w-en' },
-            h('b', {}, v.en),
-            h('span', {}, (v.isLegal ? 'Legal Phrase · عبارة قانونية: ' : (v.pos + ' · ')) + v.ar + (!v.isLegal && POS_AR[v.pos] ? ' (' + POS_AR[v.pos] + ')' : ''))),
-          oxBtn(v),
-          sayBtn(v, 'Human Pronunciation · نطق بشري ' + v.en)),
-        h('div', { class:'w-more' },
-          v.isLegal ? h('span', { class:'legal-badge' }, 'Legal Track · المسار القانوني') : null,
-          h('p', { class:'w-ex' }, v.ex),
-          h('p', {}, v.exAr),
-          v.tipEn ? h('p', { class:'w-tip-en' }, v.tipEn) : null,
-          arReveal(v.tip, false)));
-    })),
-    h('button', { class:'link', type:'button', style:'align-self:center;color:var(--dark);font-weight:700', on:{ click:openCredits } }, 'Wikimedia Commons Audio Credits · أصحاب التسجيلات الصوتية'));
-}
-
-/* ---------- review tab: Error Lab (مختبر الأخطاء) + Spaced Retention + Mistake Notebook ---------- */
 function sortedErrorLabCats(){
   var cats = (D.errorLabCatalog || []).slice();
   return cats.sort(function(a, b){
@@ -840,112 +725,108 @@ function sortedErrorLabCats(){
     return ((sb.count || 0) - (sb.solved || 0)) - ((sa.count || 0) - (sa.solved || 0));
   });
 }
-function vReview(){
-  var list = mistakeIds();
-  var cats = sortedErrorLabCats();
-  var activePatterns = cats.filter(function(c){ var st = G.errorLab[c.key]; return st && (st.count || 0) > (st.solved || 0); }).length;
-
-  var headLab = h('div', { class:'pg-h' },
-    h('h1', { class:'h1 bi-h' }, h('span', { class:'en', dir:'ltr' }, 'Error Lab & Spaced Review'), h('small', {}, 'مختبر الأخطاء والتكرار المتباعد')),
-    h('p', { class:'muted' }, biNode('Seeded with your diagnostic patterns and sorted by frequency. Top patterns feed your weekly Cambly card.', 'مزروع بأنماط الاختبار التشخيصي ومرتّب حسب التكرار، ومنه تُؤخذ أخطاء الأسبوع لبطاقة كامبلي.')));
-
-  var labHero = h('div', { class:'rv-hero', id:'elabHero' },
-    h('div', {},
-      h('span', { class:'rv-n' }, String(activePatterns || cats.length)),
-      h('span', { class:'rv-l' }, 'Priority Error Patterns · أنماط أخطاء في المختبر')),
-    h('button', { class:'btn light sm', type:'button', on:{ click:function(){ openSession('errlab'); } } }, biBtn('Practice Lab', 'تدرّب في المختبر'), ico('fwd')));
-
-  var catCards = h('div', { class:'elab-list' }, cats.map(function(cat){
+function practiceMistakes(){
+  var cats = sortedErrorLabCats(), all = allMistakeKeys(), list = mistakeIds();
+  var patterns = h('div', { class:'card plist' }, cats.map(function(cat){
     var st = G.errorLab[cat.key] || { count:cat.seedCount || 1, solved:0, box:0, fromDiag:true };
     var net = Math.max(0, (st.count || 0) - (st.solved || 0));
     var srDay = st.box > 0 ? SR_DAYS[Math.min(SR_DAYS.length - 1, st.box - 1)] : 1;
-    return h('div', { class:'elab-card' },
-      h('div', { class:'elab-top' },
-        biNode(cat.en, cat.ar),
-        h('div', { class:'elab-badges' },
-          st.fromDiag ? h('span', { class:'p-chip sr' }, 'Diagnostic · تشخيصي') : null,
-          net > 0
-            ? h('span', { class:'p-chip' }, 'Repeated ' + st.count + 'x · تكرر ' + st.count)
-            : h('span', { class:'p-chip ok' }, 'Practiced · متقن (+' + srDay + 'd)'))),
-      h('div', { class:'elab-ex' },
-        h('span', { class:'no' }, st.lastSample || cat.wrongEx),
-        h('span', { class:'yes' }, cat.rightEx)),
-      h('p', { class:'elab-rule' }, cat.ruleEn),
-      h('div', { class:'elab-foot' },
-        arReveal(cat.ruleAr, false),
-        h('button', { class:'btn sm', type:'button', on:{ click:function(){ openSession('errlab:' + cat.key); } } },
-          biBtn('New Drill', 'تمرين جديد'), ico('fwd'))));
+    return h('details', { class:'pat' },
+      h('summary', {}, h('span', { class:'pat-t' }, cat.en), net > 0 ? h('span', { class:'p-chip' }, st.count + '×') : h('span', { class:'p-chip ok' }, 'Practiced · +' + srDay + 'd'), ico('down')),
+      h('div', { class:'pat-body' },
+        h('div', { class:'elab-ex' }, h('span', { class:'no' }, st.lastSample || cat.wrongEx), h('span', { class:'yes' }, cat.rightEx)),
+        h('p', { class:'elab-rule' }, cat.ruleEn),
+        h('div', { class:'pat-acts' },
+          h('button', { class:'btn sm', type:'button', on:{ click:function(){ openSession('errlab:' + cat.key); } } }, 'New drill', ico('fwd')),
+          arReveal(cat.ruleAr, false))));
   }));
-
-  var all = allMistakeKeys();
-  var nbSecHead = h('div', { class:'sec-h' },
-    h('h2', { class:'bi-h' }, h('span', { class:'en', dir:'ltr' }, 'Mistake Notebook · All Lessons'), h('small', {}, 'دفتر الأخطاء لكل الدروس: يعود السؤال بعد يوم، ثم ٣ أيام، ثم أسبوع، ثم شهر')));
-
-  function dueChip(m){
-    var left = (m.due || 0) - Date.now();
-    if (left <= 0) return h('span', { class:'rv-due now' }, 'Due · مستحق');
-    var d = Math.max(1, Math.ceil(left / 864e5));
-    return h('span', { class:'rv-due' }, '+' + d + 'd · بعد ' + d + ' يوم');
-  }
-  var nbBlock = !all.length
-    ? h('div', { class:'empty' }, penguin(70, 99),
-        h('h2', { class:'bi-h' }, h('span', { class:'en', dir:'ltr' }, 'Notebook is Empty'), h('small', {}, 'الدفتر فارغ')),
-        h('p', {}, biNode('Any question you miss in any lesson will come back here on a spaced schedule.', 'كل سؤال تخطئ فيه في أي درس يعود إليك هنا على مواعيد متباعدة.')),
-        h('button', { class:'btn sm', type:'button', on:{ click:function(){ go('lesson'); } } }, biBtn('Go to Lesson', 'إلى الدرس')))
-    : [
-        h('div', { class:'rv-hero', id:'nbHero' },
-          h('div', {}, h('span', { class:'rv-n' }, String(list.length)), h('span', { class:'rv-l' }, list.length ? 'Due today · مستحقة اليوم' : 'Nothing due today · لا شيء مستحق اليوم')),
-          list.length ? h('button', { class:'btn light sm', type:'button', on:{ click:function(){ openSession('review'); } } }, biBtn('Start Review', 'ابدأ المراجعة'), ico('fwd')) : null),
-        h('div', { class:'rv-list' }, all.map(function(key){ var it = itemFor(key), m = G.mistakes[key];
-          return h('div', { class:'rv-row' },
-            h('div', { class:'rv-q' }, h('span', {}, lessonTag(m.lid) + ' · ' + (it.secEn || it.sec) + ' · ' + it.sec), h('p', {}, itemText(it))),
-            dueChip(m),
-            h('span', { class:'streak', 'aria-label':'Review step ' + (m.box || 0) + ' of 4 · مرحلة المراجعة ' + (m.box || 0) + ' من ٤' }, [0, 1, 2, 3].map(function(i){ return h('i', { class:(m.box || 0) > i ? 'on' : '' }); }))); }))
-      ];
-
-  return h('section', { class:'scr gut' }, headLab, quickToolsRow(),
-    labHero, catCards,
-    nbSecHead, nbBlock);
+  function dueChip(m){ var left = (m.due || 0) - Date.now();
+    if (left <= 0) return h('span', { class:'rv-due now' }, 'Due');
+    return h('span', { class:'rv-due' }, 'In ' + Math.max(1, Math.ceil(left / 864e5)) + 'd'); }
+  var notebook = !all.length
+    ? h('div', { class:'card nb-empty' }, h('span', { class:'cl-n' }, ico('mark')),
+        h('span', { class:'cl-t' }, h('b', {}, 'Mistake notebook is empty'), h('small', {}, 'Questions you miss come back here after 1 day, 3 days, a week and a month.')))
+    : [h('div', { class:'rv-hero', id:'nbHero' },
+        h('div', {}, h('span', { class:'rv-n' }, String(list.length)), h('span', { class:'rv-l' }, list.length ? 'Questions due today' : 'Nothing due today')),
+        list.length ? h('button', { class:'btn light sm', type:'button', on:{ click:function(){ openSession('review'); } } }, 'Start review', ico('fwd')) : null),
+      h('div', { class:'rv-list' }, all.map(function(key){ var it = itemFor(key), m = G.mistakes[key];
+        return h('div', { class:'rv-row' },
+          h('div', { class:'rv-q' }, h('span', {}, lessonTag(m.lid) + ' · ' + (it.secEn || it.sec)), h('p', {}, itemText(it))),
+          dueChip(m),
+          h('span', { class:'streak', 'aria-label':'Review step ' + (m.box || 0) + ' of 4' }, [0, 1, 2, 3].map(function(i){ return h('i', { class:(m.box || 0) > i ? 'on' : '' }); }))); }))];
+  return [h('p', { class:'sec-lbl' }, 'Your mistake patterns'), patterns, h('p', { class:'sec-lbl' }, 'Mistake notebook'), notebook];
 }
-
-/* ---------- lesson detail ---------- */
-function vLesson(){ var pr = lessonProgress(), cur = pr.next;
-  var arcs = '<svg class="hero-arcs" viewBox="0 0 350 268" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M-10 64 C 90 34, 210 30, 360 52" fill="none" stroke="#2C4A6E" stroke-width="2.5" vector-effect="non-scaling-stroke"/><circle cx="60" cy="340" r="205" fill="none" stroke="#2C4A6E" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>';
-  var fillPct = Math.max(0, Math.min(PARTS.length - 1, pr.done)) * 16.8;
-  return h('section', { class:'ld' },
-    h('div', { class:'gut' },
-      h('div', { class:'ld-top' },
-        h('button', { class:'ib light', type:'button', 'aria-label':'Back · رجوع', on:{ click:function(){ go('home'); } } }, ico('back')),
-        h('button', { class:'ib light', type:'button', 'aria-label':'About Lesson · عن الدرس', on:{ click:openAbout } }, ico('dots'))),
-      h('div', { class:'hero' }, h('span', { html:arcs }),
-        h('div', { class:'hero-stats' },
-          h('span', {}, h('b', {}, String(ALL_VOCAB.length)), ' phrases · عبارة'),
-          h('span', {}, h('b', {}, String(PARTS.length)), ' stages · مراحل'),
-          h('span', {}, h('b', {}, '60'), ' min · دقيقة')),
-        penguin(128, 181, 'hero-peng'),
-        h('h1', { class:'hero-title' }, D.en || 'Hello from Antarctica'),
-        h('button', { class:'ib say', type:'button', 'aria-label':'Listen to human pronunciation · استمع للنطق البشري', on:{ click:function(){ AUDIO.play(D.vocab[0]); } } }, h('span', { class:'ico', html:IC.play }))),
-      h('div', { class:'ld-desc' },
-        h('h2', { class:'bi-h' }, h('span', { class:'en', dir:'ltr', style:'color:#fff' }, D.subEn || 'Present Simple vs. Present Continuous'), h('small', { style:'color:var(--honey)' }, D.ar || 'المضارع البسيط والمضارع المستمر')),
-        D.descEn ? h('p', { class:'ld-en' }, D.descEn) : null,
-        h('p', {}, D.descAr || 'نتعلم الفرق بين ما يحدث عادةً وما يحدث الآن، من إيميل عالِمة سعودية في القارة القطبية الجنوبية.'))),
-    h('div', { class:'ld-sheet gut' },
-      h('div', { class:'sec-h' },
-        h('h2', { class:'bi-h', style:'font-size:16.5px' }, h('span', { class:'en', dir:'ltr' }, '6 Lesson Stages'), h('small', {}, 'مراحل الدرس الست')),
-        h('span', { class:'muted sm' }, h('bdi', { class:'en', dir:'ltr' }, pr.done + ' of ' + pr.total), ' · ' + pr.done + ' من ' + pr.total)),
-      h('div', { class:'parts' }, h('span', { class:'parts-line', 'aria-hidden':'true' }), h('span', { class:'parts-fill', 'aria-hidden':'true', style:'width:' + fillPct + '%' }),
-        h('ol', {}, PARTS.map(function(p){ var done = !!S.stamps[p.k], isCur = cur && cur.k === p.k;
-          return h('li', {}, h('button', { class:'pstep' + (done ? ' done' : '') + (isCur ? ' cur' : ''), type:'button', 'aria-label':p.fullEn + ' · ' + p.fullAr + (done ? '، مكتمل' : isCur ? '، المرحلة الحالية' : ''), on:{ click:function(){ openPart(p.k); } } },
-            h('span', { class:'pstep-c' }, done ? ico('check') : partIcon(p)),
-            h('span', { class:'pstep-en' }, p.en),
-            h('span', { class:'pstep-ar' }, p.ar))); }))),
-      h('div', { class:'infos' },
-        h('div', { class:'info' }, h('span', { class:'ib' }, ico('clock')), h('span', { class:'info-t' }, h('b', {}, pr.mins ? pr.mins + ' min · ' + pr.mins + ' دقيقة' : 'Done · مكتمل'), h('small', {}, pr.mins ? 'Remaining · متبقية' : 'All 6 stages · كل المراحل'))),
-        h('div', { class:'info' }, h('span', { class:'ib' }, ico('cards')), h('span', { class:'info-t' }, h('b', {}, D.vocab.length + ' + 1 legal'), h('small', {}, 'Words & legal phrase · مفردات وعبارة قانونية')))),
-      h('button', { class:'btn', type:'button', on:{ click:function(){ openPart(cur ? cur.k : 'recall'); } } },
-        cur ? (pr.done ? biBtn('Continue: ' + cur.fullEn, 'متابعة: ' + cur.fullAr) : biBtn('Start Lesson', 'ابدأ الدرس')) : biBtn('Review from Start', 'راجع الدرس من البداية'),
-        ico('fwd'))));
+function practiceWords(){
+  var k = 0, r = 0;
+  ALL_VOCAB.forEach(function(v){ if (S.cards[v.en] === 'k') k++; else if (S.cards[v.en] === 'r') r++; });
+  return [h('p', { class:'p-sum' }, k + ' known · ' + r + ' to review · ' + (ALL_VOCAB.length - k - r) + ' new'), h('div', { class:'card wlist' }, ALL_VOCAB.map(function(v){ var st = S.cards[v.en];
+      return h('details', { class:'wrow' },
+        h('summary', {}, h('span', { class:'w-st' + (st ? ' ' + st : ''), 'aria-hidden':'true' }),
+          sayBtn(v, 'Play ' + v.en),
+          h('span', { class:'w-en' },
+            h('b', {}, v.en),
+            h('span', {}, v.isLegal ? 'legal phrase · ' : (v.pos + ' · '), h('span', { class:'w-ar', dir:'rtl', lang:'ar' }, v.ar))),
+          oxBtn(v)),
+        h('div', { class:'w-more' },
+          v.isLegal ? h('span', { class:'legal-badge' }, 'Legal track') : null,
+          h('p', { class:'w-ex' }, v.ex),
+          v.exAr ? h('p', { class:'w-exar' }, v.exAr) : null,
+          v.tipEn ? h('p', { class:'w-tip-en' }, v.tipEn) : null,
+          arReveal(v.tip, false)));
+    })),
+    h('button', { class:'link credits', type:'button', on:{ click:openCredits } }, 'Audio credits')];
 }
+function practiceVerbs(){
+  var verbs = D.irregularVerbs || [], mastered = 0, learning = 0, dueCnt = 0;
+  verbs.forEach(function(v){ var s = irrStatus(v.base); if (s.st === 'k') mastered++; else if (s.st === 'r') learning++; if (s.due) dueCnt++; });
+  var curG = G.ui.irrGroup || 'all';
+  var filtered = curG === 'all' ? verbs : verbs.filter(function(v){ return v.g === curG; });
+  return [
+    h('p', { class:'p-sum' }, mastered + ' mastered · ' + learning + ' learning · ' + dueCnt + ' due'),
+    h('button', { class:'btn', type:'button', on:{ click:function(){ openSession('irregular'); } } }, ico('pen'), 'Practice irregular verbs'),
+    h('div', { class:'pills' }, (D.irregularGroups || []).map(function(g){
+      return h('button', { class:'pill-b' + (curG === g.k ? ' on' : ''), type:'button', on:{ click:function(){ G.ui.irrGroup = g.k; saveLocal(); render(); } } }, g.en);
+    })),
+    h('div', { class:'card wlist' }, filtered.map(function(v){
+      var st = irrStatus(v.base);
+      return h('details', { class:'wrow' },
+        h('summary', {},
+          h('span', { class:'w-st' + (st.st !== 'new' ? ' ' + st.st : ''), 'aria-hidden':'true' }),
+          sayBtn(v.base, 'Play ' + v.base),
+          h('span', { class:'w-en' }, h('b', {}, v.base + ' → ' + v.past + ' → ' + v.pp), h('span', {}, h('span', { class:'w-ar', dir:'rtl', lang:'ar' }, v.ar), ' · ' + st.lbl)),
+          oxBtn(v.base)),
+        h('div', { class:'w-more' },
+          h('div', { class:'irr-forms' },
+            h('div', { class:'irr-f' }, h('small', {}, 'Base'), h('b', {}, v.base)),
+            h('div', { class:'irr-f' }, h('small', {}, 'Past'), h('b', {}, v.past)),
+            h('div', { class:'irr-f' }, h('small', {}, 'Participle'), h('b', {}, v.pp)))));
+    }))];
+}
+function vReview(){
+  var tab = G.ui.practiceTab || 'mistakes';
+  var k = 0, r = 0;
+  ALL_VOCAB.forEach(function(v){ if (S.cards[v.en] === 'k') k++; else if (S.cards[v.en] === 'r') r++; });
+  var n = ALL_VOCAB.length - k - r, active = activePatternCount(), due = mistakeIds().length;
+  function setTab(t){ return function(){ G.ui.practiceTab = t; G.ui.wordsTab = t === 'verbs' ? 'irregular' : 'vocab'; saveLocal(); render(); }; }
+  var segBtn = function(t, label){ return h('button', { class:'seg-b' + (tab === t ? ' on' : ''), type:'button', role:'tab', 'aria-selected':tab === t ? 'true' : 'false', on:{ click:setTab(t) } }, label); };
+  return h('section', { class:'scr gut practice' },
+    h('h1', { class:'h1' }, 'Practice'),
+    h('div', { class:'p-cards' },
+      h('div', { class:'p-card dark', id:'elabHero' },
+        h('span', { class:'p-lbl' }, 'Mistakes'),
+        h('b', { class:'p-big' }, String(active || (D.errorLabCatalog || []).length)),
+        h('span', { class:'p-sub' }, 'patterns to fix' + (due ? ' · ' + due + ' due' : '')),
+        h('button', { class:'btn sm', type:'button', on:{ click:function(){ openSession('errlab'); } } }, 'Practice')),
+      h('div', { class:'p-card' },
+        h('span', { class:'p-lbl' }, 'Words'),
+        h('b', { class:'p-big' }, String(r || n)),
+        h('span', { class:'p-sub' }, r ? 'hard words to review' : 'new phrases'),
+        h('button', { class:'btn sm out', type:'button', on:{ click:function(){ openSession('cards'); } } }, r ? 'Review hard words' : 'Flashcards'))),
+    h('div', { class:'seg three', role:'tablist', 'aria-label':'Practice view' },
+      segBtn('mistakes', 'Mistakes'), segBtn('words', 'Words · ' + ALL_VOCAB.length), segBtn('verbs', 'Verbs · ' + (D.irregularVerbs || []).length)),
+    tab === 'words' ? practiceWords() : tab === 'verbs' ? practiceVerbs() : practiceMistakes());
+}
+function vWords(){ return vReview(); }
 
 /* ---------- reading markup ---------- */
 function parseMarkup(s){ return s
@@ -972,7 +853,7 @@ function readingTarget(r){ var t = Number(r && r.targetSeconds); return t > 0 ? 
 function arMinutes(n){ return n === 1 ? 'دقيقة' : n === 2 ? 'دقيقتين' : arDigits(n) + (n <= 10 ? ' دقائق' : ' دقيقة'); }
 var dictT;
 function showWord(el){ var en, ar, tag = '', v = null;
-  if (el.classList.contains('core')) { v = ALL_VOCAB.filter(function(x){ return String(x.en || '').toLowerCase() === el.getAttribute('data-k'); })[0]; en = v ? v.en : el.textContent; ar = v ? v.ar : ''; tag = v ? ('Lesson word · من كلمات الدرس · ' + (POS_AR[v.pos] || v.pos)) : ''; }
+  if (el.classList.contains('core')) { v = ALL_VOCAB.filter(function(x){ return String(x.en || '').toLowerCase() === el.getAttribute('data-k'); })[0]; en = v ? v.en : el.textContent; ar = v ? v.ar : ''; tag = v ? ('Lesson word · ' + v.pos) : ''; }
   else { en = el.getAttribute('data-en') || el.textContent; ar = el.getAttribute('data-ar') || ''; }
   $('#dEn').textContent = en; $('#dAr').textContent = ar; $('#dTag').textContent = tag; $('#dTag').hidden = !tag;
   var dOx = $('#dOx'); if (dOx) dOx.href = oxUrl(v || en);
@@ -1062,22 +943,32 @@ function openPart(k){ clearReadTimer(); M = null; M_POOL = null; var steps = ste
   if (typeof saved === 'number' && saved > 0 && saved < steps.length) i = saved;
   if (S.stamps[k] && steps[i] && steps[i].t === 'done') i = 0;
   if (k === 'quiz') { Q = null; i = 0; }
+  if (i === 0 && steps[0] && steps[0].t === 'intro' && steps.length > 1) i = 1;
   P = { part:k, steps:steps, i:i }; G.ui.part = k; G.ui.view = 'player'; saveLocal(); render(); try { window.scrollTo(0, 0); } catch (e) {} }
 function openSession(k){ clearReadTimer();
   var tm = /^unit(?:Test|Mini):(\d+)$/.exec(String(k));
-  if (tm && !(unitTestOf(Number(tm[1])) && unitLessonsDone(Number(tm[1])))) { toast(unitTestOf(Number(tm[1])) ? unitLockText(Number(tm[1])) : 'Test not available yet · الاختبار غير متاح بعد'); return; }
-  var steps = stepsFor(k); if (steps.length < 2) { toast(k === 'review' ? 'Notebook is empty · الدفتر فارغ' : tm ? 'Test not available yet · الاختبار غير متاح بعد' : 'No cards · لا توجد بطاقات'); return; }
+  if (tm && !(unitTestOf(Number(tm[1])) && unitLessonsDone(Number(tm[1])))) { toast(unitTestOf(Number(tm[1])) ? unitLockText(Number(tm[1])) : 'Test not available yet'); return; }
+  var steps = stepsFor(k); if (steps.length < 2) { toast(k === 'review' ? 'Notebook is empty' : tm ? 'Test not available yet' : 'No cards'); return; }
   P = { part:k, steps:steps, i:0, session:true }; G.ui.part = k; G.ui.view = 'player'; saveLocal(); render(); try { window.scrollTo(0, 0); } catch (e) {} }
 function closePlayer(){ clearReadTimer(); var sess = P && P.session, k = String((P && P.part) || ''); P = null; G.ui.part = null;
-  if (!sess) { go('lesson'); return; }
+  if (!sess) { go('home'); return; }
   if (k === 'express') { go('home'); return; }
   if (k === 'review' || k === 'errlab' || k.indexOf('errlab:') === 0) { go('review'); return; }
   if (k.indexOf('unitTest:') === 0 || k.indexOf('unitMini:') === 0 || k.indexOf('pretest:') === 0) { go('lessons'); return; }
-  go('words');
+  G.ui.practiceTab = k === 'irregular' ? 'verbs' : 'words'; go('review');
 }
-function goStep(i){ clearReadTimer(); if (!P) return; P.i = Math.max(0, Math.min(P.steps.length - 1, i)); if (!P.session) { S.step[P.part] = P.i; saveLocal(); } render(); try { window.scrollTo(0, 0); } catch (e) {} }
+/* شاشة التقديم (intro) تبقى أول خطوة في القائمة فلا تتغير أرقام التقدم المحفوظ، لكنها لا تُعرض:
+   يبدأ الدرس من الخطوة 1، وتفصيلها في نافذة زر «عن المرحلة». */
+function firstStep(){ return (P && P.steps[0] && P.steps[0].t === 'intro' && P.steps.length > 1) ? 1 : 0; }
+function goStep(i){ clearReadTimer(); if (!P) return; P.i = Math.max(firstStep(), Math.min(P.steps.length - 1, i)); if (!P.session) { S.step[P.part] = P.i; saveLocal(); } render(); try { window.scrollTo(0, 0); } catch (e) {} }
 function nextStep(){ if (!P) return; if (P.i >= P.steps.length - 1) { closePlayer(); return; } goStep(P.i + 1); }
-function prevStep(){ if (P && P.i > 0) goStep(P.i - 1); }
+function prevStep(){ if (P && P.i > firstStep()) goStep(P.i - 1); }
+function openStageInfo(k){ var p = partOf(k), info = (D.intro && D.intro[k]) || {}, n = PARTS.indexOf(p) + 1;
+  openSheet(p.fullEn, p.fullAr, [
+    h('p', { class:'muted sm' }, 'Stage ' + n + ' of ' + PARTS.length + ' · about ' + p.min + ' min'),
+    info.dEn ? h('p', {}, info.dEn) : null,
+    info.d ? arReveal(info.d, false) : null,
+    h('ul', { class:'stage-info' }, (info.items || []).map(function(x){ return h('li', {}, ico(x[0]), h('span', {}, x[1])); }))]); }
 
 var EN_LABELS = {
   'التالي': 'Next',
@@ -1116,9 +1007,11 @@ function formatCtaLabel(label){
 }
 
 function vPlayer(){
-  if (!P) { var k = G.ui.part; if (!k || ['recall','vocab','grammar','reading','writing','quiz'].indexOf(k) < 0) { G.ui.view = 'lesson'; return vLesson(); }
+  if (!P) { var k = G.ui.part; if (!k || ['recall','vocab','grammar','reading','writing','quiz'].indexOf(k) < 0) { G.ui.view = 'home'; return vHome(); }
     var steps = stepsFor(k), i = S.step[k] || 0; if (k === 'quiz') i = 0; P = { part:k, steps:steps, i:Math.min(i, steps.length - 1) }; }
-  var st = P.steps[P.i], N = P.steps.length;
+  if (P.i < firstStep()) P.i = firstStep();
+  var off = firstStep(), st = P.steps[P.i], N = P.steps.length - off, pos = P.i - off + 1;
+  var part = !P.session ? partOf(P.part) : null;
   var cta = h('button', { class:'btn', type:'button' }, formatCtaLabel('التالي'), ico('fwd'));
   var ctl = {
     cta:cta,
@@ -1130,14 +1023,17 @@ function vPlayer(){
   var foot = h('div', { class:'pl-foot gut' });
   var backBtn = h('button', { class:'ib back', type:'button', 'aria-label':'Previous step · الخطوة السابقة', on:{ click:prevStep } }, ico('back'));
   var body = renderStep(st, ctl, foot);
-  if (P.i > 0 && st.t !== 'done' && st.t !== 'sessionDone' && st.t !== 'quizResult' && !(P.part === 'quiz' && st.t === 'quizQ')) foot.prepend(backBtn);
+  if (P.i > off && st.t !== 'done' && st.t !== 'sessionDone' && st.t !== 'quizResult' && !(P.part === 'quiz' && st.t === 'quizQ')) foot.prepend(backBtn);
   foot.append(cta);
+  var stageLine = part ? h('div', { class:'pl-stage' },
+    h('span', {}, part.fullEn + ' · stage ' + (PARTS.indexOf(part) + 1) + ' of ' + PARTS.length),
+    (D.intro && D.intro[part.k]) ? h('button', { class:'pl-info', type:'button', 'aria-label':'About this stage', on:{ click:function(){ openStageInfo(part.k); } } }, ico('info'), 'About') : null) : null;
   return h('section', { class:'pl' },
     h('div', { class:'pl-top gut' },
       h('button', { class:'ib', type:'button', 'aria-label':'Close · إغلاق', on:{ click:closePlayer } }, ico('x')),
-      h('div', { class:'pbar', 'aria-hidden':'true' }, h('span', { style:'width:' + Math.round((P.i + 1) / N * 100) + '%' })),
-      h('span', { class:'pcount' }, (P.i + 1) + '/' + N)),
-    h('div', { class:'pl-body gut' }, body), foot);
+      h('div', { class:'pbar', 'aria-hidden':'true' }, h('span', { style:'width:' + Math.round(pos / N * 100) + '%' })),
+      h('span', { class:'pcount' }, pos + ' / ' + N)),
+    h('div', { class:'pl-body gut' }, stageLine, body), foot);
 }
 function renderStep(st, ctl, foot){
   switch (st.t) {
@@ -1173,12 +1069,16 @@ function renderStep(st, ctl, foot){
   }
   return h('p', {}, '');
 }
+/* label: عنوان الخطوة أو عدّادها، بالإنجليزي وحده. instr: تعليمة السؤال، وتحتها سطر عربي صغير. */
 function label(enText, arText, extra){
-  if (arguments.length === 2 && (arText == null || typeof arText === 'object')) {
-    extra = arText; arText = null;
-  }
-  return h('p', { class:'st-lbl' },
-    arText ? biNode(enText, arText) : h('span', { html:arHTML(enText) }),
+  if (arguments.length === 2 && (arText == null || typeof arText === 'object')) extra = arText;
+  return instr(enText, null, extra);
+}
+function instr(enText, arText, extra){
+  return h('div', { class:'st-lbl' },
+    h('div', { class:'st-tx' },
+      h('p', { class:'st-en', dir:'ltr', html:arHTML(enText) }),
+      arText ? h('p', { class:'st-ar', dir:'rtl', lang:'ar', html:arHTML(arText) }) : null),
     extra || null);
 }
 
@@ -1218,7 +1118,7 @@ function RecallTyping(x, o, ctl){
   var cueEn = x.promptEn ? h('p', { class:'en', dir:'ltr', style:'font-size:14.5px;color:var(--on-dark-2);margin-bottom:4px;text-align:left' }, x.promptEn + (x.hint ? ' · [' + x.hint + ']' : '')) : null;
   var cueAr = h('p', { class:'q-ar', style:'margin-bottom:8px;color:var(--honey)' }, 'المعنى المطلوب: ' + (x.promptAr || x.cueAr || ''));
   /* شارة «عبارة قانونية» لما وُسم في الدرس بـ isLegal وحده (كانت مربوطة بالسؤال rc-4 أيًّا كان). */
-  var card = qCard(h('div', {}, cueEn, cueAr, sent), { tag: x.isLegal ? 'Legal Phrase · عبارة قانونية' : 'Active Recall · استرجاع وإملاء' });
+  var card = qCard(h('div', {}, cueEn, cueAr, sent), x.isLegal ? { tag:'Legal phrase' } : {});
   var fb = h('div', { hidden:true }), done = false;
   function check(){
     if (done) return;
@@ -1237,11 +1137,11 @@ function RecallTyping(x, o, ctl){
     var caseOnly = !exact && !!x.exact && x.ans.some(function(a){ return norm(a) === norm(v); });
     var whyEn = caseOnly ? (CASE_NOTE_EN + ' "' + targetWord + '". ' + (x.spellNoteEn || '')) : closeSpell ? ('Close! You recalled the word, but check the spelling: "' + targetWord + '". ' + (x.spellNoteEn || '')) : (x.spellNoteEn || 'Spelling pattern checked.');
     var whyAr = caseOnly ? (CASE_NOTE_AR + ' ' + targetWord + '. ' + (x.spellNote || x.spellNoteAr || '')) : closeSpell ? ('تذكّرت الكلمة بشكل قريب، لكن انتبه للإملاء الصحيح: ' + targetWord + '. ' + (x.spellNote || x.spellNoteAr || '')) : (x.spellNote || x.spellNoteAr || '');
-    var cardNode = fbCard(exact, whyAr, null, exact ? null : [caseOnly ? 'Correct form · الصيغة الصحيحة' : 'Correct spelling · الإملاء الصحيح', targetWord], whyEn);
+    var cardNode = fbCard(exact, whyAr, null, exact ? null : [caseOnly ? 'Correct form' : 'Correct spelling', targetWord], whyEn);
     var tools = h('div', { class:'audio-row' },
-      sayBtn(targetWord, 'Human Pronunciation · نطق بشري'),
+      sayBtn(targetWord, 'Human Pronunciation'),
       oxBtn(targetWord),
-      h('span', { class:'repeat-pill' }, 'Listen & repeat · استمع وردّد'));
+      h('span', { class:'repeat-pill' }, 'Listen & repeat'));
     cardNode.querySelector('.fb-t').append(tools);
     put(fb, cardNode);
   }
@@ -1262,20 +1162,20 @@ function stFlash(st, ctl, foot){ var v = ALL_VOCAB[st.i], mark = S.cards[v.en];
   var card = h('div', { class:'fc', role:'button', tabindex:'0', 'aria-label':'Flashcard ' + v.en + ' · بطاقة ' + v.en + '، اضغط لقلبها' });
   var arcs = '<svg class="fc-arc" viewBox="0 0 320 360" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M-10 334 C 90 300, 220 300, 330 322" fill="none" stroke="#E2D9CC" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M-10 352 C 110 326, 210 328, 330 344" fill="none" stroke="#EFE9DF" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>';
   var front = h('div', { class:'fc-face fc-front' }, h('span', { html:arcs }),
-    sayBtn(v, 'Human Pronunciation · نطق بشري'),
-    v.isLegal ? h('span', { class:'legal-badge', style:'position:relative' }, 'Legal Phrase · عبارة قانونية') : h('span', { class:'fc-pos' }, v.pos),
+    sayBtn(v, 'Human Pronunciation'),
+    v.isLegal ? h('span', { class:'legal-badge', style:'position:relative' }, 'Legal Phrase') : h('span', { class:'fc-pos' }, v.pos),
     h('span', { class:'fc-word', style:v.en.length > 12 ? 'font-size:34px' : '' }, v.en),
-    h('span', { class:'fc-say' }, 'Sounds like · تُنطق تقريبًا: ', h('b', {}, v.say)),
+    h('span', { class:'fc-say' }, 'Sounds like: ', h('b', {}, v.say)),
     h('div', { class:'audio-row', style:'position:relative;justify-content:center' },
       oxBtn(v),
-      h('span', { class:'repeat-pill' }, 'Listen & repeat · استمع وردّد')),
-    h('span', { class:'fc-hint' }, 'Tap card to flip · اضغط على البطاقة لقلبها'));
+      h('span', { class:'repeat-pill' }, 'Listen & repeat')),
+    h('span', { class:'fc-hint' }, 'Tap card to flip'));
   var back = h('div', { class:'fc-face fc-back' },
-    v.isLegal ? h('span', { class:'legal-badge', style:'align-self:flex-start' }, 'Legal Track · المسار القانوني') : null,
+    v.isLegal ? h('span', { class:'legal-badge', style:'align-self:flex-start' }, 'Legal Track') : null,
     h('span', { class:'fc-ar' }, v.ar),
-    h('div', { class:'fc-exrow' }, h('p', { class:'fc-ex' }, v.ex), sayBtn(v, 'Human Pronunciation · نطق الكلمة')),
+    h('div', { class:'fc-exrow' }, h('p', { class:'fc-ex' }, v.ex), sayBtn(v, 'Human Pronunciation')),
     h('p', { class:'fc-exar' }, v.exAr),
-    h('div', { class:'audio-row' }, oxBtn(v), h('span', { class:'repeat-pill' }, 'Repeat aloud · ردّد بصوت مسموع')),
+    h('div', { class:'audio-row' }, oxBtn(v), h('span', { class:'repeat-pill' }, 'Repeat aloud')),
     h('div', { class:'fc-tip' },
       v.tipEn ? h('p', { class:'fc-tip-en' }, v.tipEn) : null,
       v.tipEn ? arReveal(v.tip, false) : h('p', { html:arHTML(v.tip) })));
@@ -1290,7 +1190,7 @@ function stFlash(st, ctl, foot){ var v = ALL_VOCAB[st.i], mark = S.cards[v.en];
     h('button', { class:'btn', type:'button', on:{ click:function(){ markIt('k'); } } }, biBtn('I know it', 'أعرفها'))
   );
   var total = st.session ? P.steps.length - 1 : ALL_VOCAB.length, pos = st.session ? P.i + 1 : st.i + 1;
-  return [label('Phrase ' + pos + ' of ' + total, 'بطاقة ' + pos + ' من ' + total, mark ? h('span', { class:'tag' }, mark === 'k' ? 'Known · تعرفها' : 'To review · للمراجعة') : null), card];
+  return [label('Phrase ' + pos + ' of ' + total, 'بطاقة ' + pos + ' من ' + total, mark ? h('span', { class:'tag' }, mark === 'k' ? 'Known' : 'To review') : null), card];
 }
 
 /* matching (randomized pool across rounds + true derangement so pattern is never fixed) */
@@ -1334,8 +1234,8 @@ function stMatch(ctl){ var box = h('div', { class:'mt-box' });
     label('Matching Game', 'لعبة التوصيل'),
     h('div', { class:'fb' }, h('span', { class:'fb-ic' }, ico('check')),
       h('div', { class:'fb-t' },
-        h('b', {}, 'Game Complete · اكتملت اللعبة'),
-        h('p', {}, misses == null ? ('You matched all ' + totalW + ' words with their meanings. · وصّلت العبارات الـ ' + totalW + ' بمعانيها.') : (misses === 0 ? 'Zero mistakes. Great job! · بدون أي خطأ. ممتاز!' : 'Wrong attempts: ' + misses + ' · عدد المحاولات الخاطئة: ' + misses)))),
+        h('b', {}, 'Game Complete'),
+        h('p', {}, misses == null ? ('You matched all ' + totalW + ' words with their meanings.') : (misses === 0 ? 'Zero mistakes. Great job!' : 'Wrong attempts: ' + misses + ' · عدد المحاولات الخاطئة: ' + misses)))),
     h('button', { class:'btn out sm', type:'button', style:'align-self:flex-start', on:{ click:function(){ M_POOL = null; M = mkRound(0, 0); draw(); } } }, biBtn('New Random Round', 'جولة عشوائية جديدة'))); }
   function draw(){ ctl.set('التالي', !!S.match, nextStep);
     var byEn = {}; ALL_VOCAB.forEach(function(v){ byEn[v.en] = v; });
@@ -1347,10 +1247,10 @@ function stMatch(ctl){ var box = h('div', { class:'mt-box' });
         if (M.n === (M.target || 6)) { if (M.round === 0) { var ms = M.misses; setTimeout(function(){ M = mkRound(1, ms); draw(); }, 550); } else { var mm = M.misses; setTimeout(function(){ M = null; S.match = true; touch(); updateProgress(); done(mm); }, 450); } } }
       else { M.locked = true; M.misses++; [a.el, el].forEach(function(x){ x.classList.add('miss'); }); setTimeout(function(){ [a.el, el].forEach(function(x){ x.classList.remove('miss'); }); M.locked = false; }, 550); } }
     put(box,
-      label('Matching Game', 'لعبة التوصيل', h('b', {}, 'Round ' + (M.round + 1) + ' of 2 · الجولة ' + (M.round + 1) + ' من 2')),
+      label('Matching Game', 'لعبة التوصيل', h('b', {}, 'Round ' + (M.round + 1) + ' of 2')),
       h('div', { style:'display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap' },
         h('p', { class:'muted' }, biNode('Tap an English word, then tap its Arabic meaning.', 'اضغط على الكلمة، ثم على معناها.')),
-        h('button', { class:'ar-btn', type:'button', on:{ click:function(){ M_POOL = null; M = mkRound(0, 0); draw(); } } }, ico('review'), 'خلط عشوائي · Shuffle')),
+        h('button', { class:'ar-btn', type:'button', on:{ click:function(){ M_POOL = null; M = mkRound(0, 0); draw(); } } }, ico('review'), 'Shuffle')),
       h('div', { class:'match' }, h('div', { class:'m-col' }, M.ar.map(function(k){ return item('ar', k, byEn[k].ar); })), h('div', { class:'m-col' }, M.en.map(function(k){ return item('en', k, k); })))); }
   if (S.match && !M) done(null); else { if (!M) M = mkRound(0, 0); draw(); }
   return box;
@@ -1363,11 +1263,11 @@ function fbCard(ok, why, ev, fix, whyEn, head){
   return h('div', { class:'fb' + (ok ? '' : ' bad'), role:'status' }, h('span', { class:'fb-ic' }, ico(ok ? 'check' : 'x')),
     h('div', { class:'fb-t' },
       /* الجزء الإنجليزي داخل bdi، وإلا انتقلت علامة التعجب في السطر العربي إلى أول الكلمة فظهرت «!Correct». */
-      h('b', {}, head || (ok ? [h('bdi', { dir:'ltr', lang:'en' }, 'Correct!'), ' · إجابة صحيحة'] : [h('bdi', { dir:'ltr', lang:'en' }, 'Not quite'), ' · ليست هذه'])),
+      h('b', {}, head || (ok ? 'Correct' : 'Not quite')),
       extra,
       whyEn ? h('p', { class:'fb-en' }, whyEn) : null,
       why ? (whyEn ? arReveal(why, false) : h('p', { html:arHTML(why) })) : null,
-      ev ? h('div', { class:'fb-ev' }, h('span', {}, 'From the text · من النص'), h('q', { dir:'ltr', lang:'en' }, ev)) : null));
+      ev ? h('div', { class:'fb-ev' }, h('span', {}, 'From the text'), h('q', { dir:'ltr', lang:'en' }, ev)) : null));
 }
 function blankText(s, word){ return s.replace('___', word || '...'); }
 function qCard(content, opts){ opts = opts || {};
@@ -1375,7 +1275,7 @@ function qCard(content, opts){ opts = opts || {};
   return c; }
 /* الوضع الصامت (o.quiet) في MCQ وTyping، ويُستعمل في الاختبار القبلي وحده: بعد الإجابة لا صح ولا خطأ ولا بطاقة ولا جواب،
    بل حالة «حُفظت» محايدة وسطر صغير. وبدون o.quiet يبقى السلوك كما كان في الدروس والاختبارات والمراجعات. */
-function savedNote(){ return h('p', { class:'saved-note', role:'status' }, h('bdi', { dir:'ltr', lang:'en' }, 'Answer saved'), ' · حُفظت إجابتك'); }
+function savedNote(){ return h('p', { class:'saved-note', role:'status' }, 'Answer saved'); }
 function MCQ(x, o){ o = o || {}; var quiet = !!o.quiet, isBlank = x.prompt.indexOf('___') >= 0, longOpts = x.opts.some(function(t){ return t.length > 22; });
   var picked = null;
   var prompt = h('p', { class:'q-en' + (isBlank ? '' : ' sm'), dir:'ltr' });
@@ -1393,20 +1293,20 @@ function MCQ(x, o){ o = o || {}; var quiet = !!o.quiet, isBlank = x.prompt.index
     btns.forEach(function(b, j){ b.disabled = true; var dot = b.querySelector('.o-dot');
       if (j === x.a) { b.classList.add('ok'); put(dot, ico('check')); } else if (j === i) { b.classList.add('bad'); put(dot, ico('x')); } else b.classList.add('dim'); });
     if (isBlank) { var blk = prompt.querySelector('.blank'); blk.textContent = x.opts[i]; blk.classList.add(ok ? 'ok' : 'bad'); }
-    fb.hidden = false; put(fb, fbCard(ok, x.why, x.ev, ok ? null : ['Correct answer · الإجابة الصحيحة', x.opts[x.a]], x.whyEn)); }
+    fb.hidden = false; put(fb, fbCard(ok, x.why, x.ev, ok ? null : ['Correct answer', x.opts[x.a]], x.whyEn)); }
   if (o.saved && typeof o.saved.v === 'number') show(o.saved.v);
   return [card, h('div', { class:'opts' }, btns), fb];
 }
 function TF(x, o){ o = o || {}; var reading = !!o.reading, truth = reading ? !!x.a : !!x.ok, vals = [true, false];
-  var labels = reading ? ['True · صح', 'False · خطأ'] : ['Correct · صحيحة', 'Has a mistake · فيها خطأ'];
+  var labels = reading ? ['True', 'False'] : ['Correct', 'Has a mistake'];
   var sent = h('p', { class:'q-en sm', dir:'ltr' }, reading ? x.q : x.s), fb = h('div', { hidden:true }), answered = false;
-  var card = qCard(sent, { tag:o.tag || (reading ? 'True or False? · صح أم خطأ؟' : null) });
+  var card = qCard(sent, { tag:o.tag || (reading ? 'True or False?' : null) });
   var btns = vals.map(function(v, i){ var b = h('button', { class:'opt center', type:'button' }, h('span', {}, labels[i]), h('span', { class:'o-dot' }));
     b.addEventListener('click', function(){ if (answered) return; show(v); if (o.onAnswer) o.onAnswer(v === truth, v); }); return b; });
   function show(v){ answered = true; var ok = v === truth;
     btns.forEach(function(b, i){ b.disabled = true; b.classList.add(vals[i] === truth ? 'ok' : (vals[i] === v ? 'bad' : 'dim')); });
     if (!reading && !x.ok) sent.classList.add('struck');
-    fb.hidden = false; put(fb, fbCard(ok, x.why, reading ? x.ev : null, (!reading && !x.ok) ? ['Correction · التصحيح', x.fix] : null, x.whyEn)); }
+    fb.hidden = false; put(fb, fbCard(ok, x.why, reading ? x.ev : null, (!reading && !x.ok) ? ['Correction', x.fix] : null, x.whyEn)); }
   if (o.saved && typeof o.saved.v === 'boolean') show(o.saved.v);
   return [card, h('div', { class:'opts two' }, btns), fb];
 }
@@ -1430,7 +1330,7 @@ function typedExactOK(x, v){ var n = exactNorm(v), pre = (x.pre && x.pre !== '__
     return forms.indexOf(n) >= 0; }); }
 function typedOK(x, v){ return x.exact ? typedExactOK(x, v) : typedLooseOK(x, v); }
 function Typing(x, o, ctl){ o = o || {}; var quiet = !!o.quiet;
-  var inp = h('input', { class:'gap-in' + (o.wide ? ' wide' : ''), type:'text', dir:'ltr', autocomplete:'off', autocapitalize:'off', autocorrect:'off', spellcheck:'false', enterkeyhint:'done', 'aria-label':(isVerbCue(x) ? 'Verb form · صيغة الفعل ' : 'Correct form · الصيغة الصحيحة ') + x.verb });
+  var inp = h('input', { class:'gap-in' + (o.wide ? ' wide' : ''), type:'text', dir:'ltr', autocomplete:'off', autocapitalize:'off', autocorrect:'off', spellcheck:'false', enterkeyhint:'done', 'aria-label':(isVerbCue(x) ? 'Verb form' : 'Correct form') + x.verb });
   var noSpace = /^[.!?,]/.test(x.post);
   var sent = h('p', { class:'q-en', dir:'ltr' }, x.pre + ' ', inp, ' ', h('span', { class:'verb' }, '(' + x.verb + ')'), noSpace ? '' : ' ', x.post);
   var fb = h('div', { hidden:true }), done = false;
@@ -1443,7 +1343,7 @@ function Typing(x, o, ctl){ o = o || {}; var quiet = !!o.quiet;
     /* الإجابة الصحيحة بحروف خاطئة الحالة (riyadh): تنبيه على الحرف الكبير مع الصيغة الصحيحة. */
     var caseOnly = !ok && !!x.exact && typedLooseOK(x, v);
     put(fb, fbCard(ok, caseOnly ? CASE_NOTE_AR + ' ' + x.ans[0] + '. ' + (x.why || '') : x.why, null,
-      ok ? null : [caseOnly ? 'Correct form · الصيغة الصحيحة' : 'Correct answer · الإجابة الصحيحة', x.ans[0]],
+      ok ? null : [caseOnly ? 'Correct form' : 'Correct answer', x.ans[0]],
       caseOnly ? CASE_NOTE_EN + ' "' + x.ans[0] + '". ' + (x.whyEn || '') : x.whyEn)); }
   inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); check(); } });
   if (o.saved && typeof o.saved.v === 'string') show(o.saved.v, !!o.saved.c);
@@ -1452,13 +1352,13 @@ function Typing(x, o, ctl){ o = o || {}; var quiet = !!o.quiet;
 }
 function Builder(x, o, ctl){ o = o || {}; var placed = [], locked = false;
   var line = h('div', { class:'b-line', dir:'ltr' }), pool = h('div', { class:'b-pool', dir:'ltr' }), fb = h('div', { hidden:true });
-  var clear = h('button', { class:'link', type:'button', style:'align-self:flex-start' }, 'Reset words · مسح والبدء من جديد');
+  var clear = h('button', { class:'link', type:'button', style:'align-self:flex-start' }, 'Reset words');
   function draw(){
-    put(line, placed.length ? placed.map(function(ci, pos){ var b = h('button', { class:'chip', type:'button', disabled:locked }, x.chips[ci]); b.addEventListener('click', function(){ if (locked) return; placed.splice(pos, 1); draw(); }); return b; }) : h('span', { class:'b-ph' }, 'Tap words below in the right order · اضغط الكلمات بالترتيب الصحيح'));
+    put(line, placed.length ? placed.map(function(ci, pos){ var b = h('button', { class:'chip', type:'button', disabled:locked }, x.chips[ci]); b.addEventListener('click', function(){ if (locked) return; placed.splice(pos, 1); draw(); }); return b; }) : h('span', { class:'b-ph' }, 'Tap words below in the right order'));
     put(pool, x.chips.map(function(c, ci){ if (placed.indexOf(ci) >= 0) return null; var b = h('button', { class:'chip', type:'button', disabled:locked }, c); b.addEventListener('click', function(){ if (locked) return; placed.push(ci); draw(); }); return b; }));
     if (!locked && ctl) ctl.set('تحقق', placed.length === x.chips.length, check);
   }
-  function finish(ok){ locked = true; draw(); line.classList.add(ok ? 'ok' : 'bad'); pool.hidden = true; clear.hidden = true; fb.hidden = false; put(fb, fbCard(ok, x.why, null, ok ? null : ['Correct order · الترتيب الصحيح', x.ans], x.whyEn)); }
+  function finish(ok){ locked = true; draw(); line.classList.add(ok ? 'ok' : 'bad'); pool.hidden = true; clear.hidden = true; fb.hidden = false; put(fb, fbCard(ok, x.why, null, ok ? null : ['Correct order', x.ans], x.whyEn)); }
   function check(){ if (locked || placed.length !== x.chips.length) return; var s = placed.map(function(i){ return x.chips[i]; }).join(' '), ok = s === x.ans; finish(ok); if (o.onAnswer) o.onAnswer(ok, placed.slice()); }
   clear.addEventListener('click', function(){ if (locked) return; placed = []; draw(); });
   if (o.saved && Array.isArray(o.saved.v)) { placed = o.saved.v.slice(); finish(!!o.saved.c); } else draw();
@@ -1470,7 +1370,7 @@ function stItem(st, ctl){ var it = st.review ? itemFor(st.key) : ITEMS[st.id]; i
     if (review) {
       var m = G.mistakes[st.key];
       if (m) {
-        if (c) { m.box = (m.box || 0) + 1; if (m.box >= SR_DAYS.length) { delete G.mistakes[st.key]; toast('Question cleared! · سؤال خرج من الدفتر'); } else m.due = Date.now() + SR_DAYS[m.box] * 864e5; }
+        if (c) { m.box = (m.box || 0) + 1; if (m.box >= SR_DAYS.length) { delete G.mistakes[st.key]; toast('Question cleared!'); } else m.due = Date.now() + SR_DAYS[m.box] * 864e5; }
         else { m.box = 0; m.due = Date.now() + SR_DAYS[0] * 864e5; }
         touch(); updateNav();
       }
@@ -1479,14 +1379,14 @@ function stItem(st, ctl){ var it = st.review ? itemFor(st.key) : ITEMS[st.id]; i
     ctl.enable(); } };
   var nodes;
   if (it.type === 'recall') nodes = RecallTyping(it.x, o, ctl);
-  else if (it.type === 'mcq') nodes = MCQ(it.x, Object.assign(o, { tag:(it.secEn ? it.secEn + ' · ' : '') + it.sec }));
+  else if (it.type === 'mcq') nodes = MCQ(it.x, Object.assign(o, review ? { tag:it.secEn || it.sec } : {}));
   else if (it.type === 'tf') nodes = TF(it.x, o);
   else if (it.type === 'rtf') nodes = TF(it.x, Object.assign(o, { reading:true }));
   else if (it.type === 'typing') nodes = Typing(it.x, o, ctl);
   else nodes = Builder(it.x, o, ctl);
   if ((it.type === 'mcq' || it.type === 'tf' || it.type === 'rtf') && !saved) ctl.set('التالي', false, nextStep);
-  var extra = review ? h('span', { class:'tag' }, 'Review · مراجعة · ' + lessonTag(String(st.key).split('|')[0])) : (it.secEn === 'Listening' && D.listening && D.listening.url ? h('a', { class:'ox-link', href:D.listening.url, target:'_blank', rel:'noopener noreferrer' }, 'Audio Clip ↗') : null);
-  return [label(it.groupEn || it.group, it.group, extra)].concat(nodes);
+  var extra = review ? h('span', { class:'tag' }, 'Review · ' + lessonTag(String(st.key).split('|')[0])) : (it.secEn === 'Listening' && D.listening && D.listening.url ? h('a', { class:'ox-link', href:D.listening.url, target:'_blank', rel:'noopener noreferrer' }, 'Audio Clip ↗') : null);
+  return [instr(it.groupEn || it.group, it.groupEn ? it.group : null, extra)].concat(nodes);
 }
 
 /* grammar explain: simplified English first, Arabic hidden under "اعرض بالعربي" (except Common Arab Mistakes which stays bilingual) */
@@ -1502,7 +1402,7 @@ function stExplain(i, ctl){ var c = GCARDS[i];
   return [
     label('Grammar Explanation · ' + (i + 1) + ' of ' + GCARDS.length, 'شرح القاعدة · ' + (i + 1) + ' من ' + GCARDS.length),
     box,
-    SAMPLE ? h('button', { class:'link', type:'button', style:'align-self:flex-start;color:var(--dark);font-weight:700', on:{ click:function(){ openAsk(); } } }, 'Need help? Ask the Teacher · عندك سؤال؟ اسأل المعلم') : null
+    SAMPLE ? h('button', { class:'link', type:'button', style:'align-self:flex-start;color:var(--dark);font-weight:700', on:{ click:function(){ openAsk(); } } }, 'Need help? Ask the Teacher') : null
   ];
 }
 
@@ -1520,10 +1420,10 @@ function stPredict(ctl){ var p = D.reading.predict, sel = S.predict;
       h('span', { class:'o-dot' }));
     b.addEventListener('click', function(){ S.predict = i; S.revealed = false; touch(); btns.forEach(function(x, j){ x.classList.toggle('picked', j === i); }); ctl.enable('القراءة الأولى'); }); return b; });
   return [
-    label('Step 1 · Predict Before Reading', 'الخطوة 1 · توقّع قبل القراءة'),
-    qCard(h('div', {}, p.qEn ? h('p', { class:'q-en sm', dir:'ltr', style:'margin-bottom:6px' }, p.qEn) : null, h('p', { class:'q-ar' }, p.q)), { tag:'Predict · توقّع' }),
+    label('Step 1 · Predict Before Reading', 'الخطوة 1'),
+    qCard(h('div', {}, p.qEn ? h('p', { class:'q-en sm', dir:'ltr', style:'margin-bottom:6px' }, p.qEn) : null, h('p', { class:'q-ar' + (p.qEn ? ' sub' : ''), dir:'rtl', lang:'ar' }, p.q))),
     h('div', { class:'opts' }, btns),
-    h('p', { class:'hint' }, 'Guess before reading. Next is a quick first reading for the main idea. · توقّع بدون ما تقرأ، وبعدها قراءة أولى سريعة للفكرة العامة.')
+    h('p', { class:'hint' }, 'Guess before reading. Next is a quick first reading for the main idea.')
   ];
 }
 
@@ -1536,7 +1436,7 @@ function stRead1(ctl){
   readTimerId = setInterval(function(){ sec++; tSpan.textContent = fmtSec(sec) + ' / ' + tgt; }, 1000);
   var mail = h('article', { class:'mail', 'aria-label':'First Reading · القراءة الأولى' }, mailHead(r), emailBody(true));
   return [
-    label('Step 2 · First Reading (Main Idea)', 'الخطوة 2 · القراءة الأولى للفكرة العامة', h('span', { class:'tag' }, 'No dictionary · بدون معاني')),
+    label('Step 2 · First Reading (Main Idea)', 'الخطوة 2', h('span', { class:'tag' }, 'No dictionary')),
     h('div', { class:'rtimer' },
       biNode('Comfortable advisory timer (~' + mins + ' min) — read for the general idea without stopping at words.', 'مؤقت إرشادي مريح (نحو ' + arMinutes(mins) + ') — اقرأ للفكرة العامة دون التوقف عند الكلمات.'),
       tSpan),
@@ -1551,7 +1451,7 @@ function stReveal(ctl){ var p = D.reading.predict, ins = D.reading.insight; ctl.
   var ok = S.predict === p.a;
   return [
     label('Check Your Prediction', 'تحقق من توقّعك'),
-    S.predict == null ? h('p', { class:'muted' }, 'No prediction recorded this time. · ما سجّلت توقّعًا هذه المرة.') :
+    S.predict == null ? h('p', { class:'muted' }, 'No prediction recorded this time.') :
       fbCard(ok, p.reveal, null, null, p.revealEn),
     ins ? h('div', { class:'insight' },
       h('h3', { class:'bi-h', style:'font-size:16px' }, h('span', { class:'en', dir:'ltr' }, ins.titleEn), h('small', {}, ins.titleAr)),
@@ -1568,26 +1468,26 @@ function stEmail(ctl){ var r = D.reading, raw = (r.paras || []).join(' ');
   var mail = h('article', { class:'mail' + (S.hl ? ' hl-on' : ''), 'aria-label':'Second Reading · القراءة الثانية' }, mailHead(r), emailBody(false));
   /* أسماء الألوان من الدرس (reading.lg1 / lg2 / lg3)، ولا يُشرح لون لا يستعمله نصه. */
   var legend = h('div', { class:'legend', hidden:!S.hl },
-    raw.indexOf('<<s:') >= 0 ? h('span', { class:'lg s' }, r.lg1 || 'Present Simple · المضارع البسيط') : null,
-    raw.indexOf('<<c:') >= 0 ? h('span', { class:'lg c' }, r.lg2 || 'Present Continuous · المستمر') : null,
-    raw.indexOf('<<t:') >= 0 ? h('span', { class:'lg t' }, r.lg3 || 'Signal word · كلمة إشارة') : null);
+    raw.indexOf('<<s:') >= 0 ? h('span', { class:'lg s' }, r.lg1 || 'Present Simple') : null,
+    raw.indexOf('<<c:') >= 0 ? h('span', { class:'lg c' }, r.lg2 || 'Present Continuous') : null,
+    raw.indexOf('<<t:') >= 0 ? h('span', { class:'lg t' }, r.lg3 || 'Signal word') : null);
   var nW = Math.max(10, Math.round(readingWords(r) / 10) * 10);
   var tg = h('input', { type:'checkbox', id:'hlToggle' }); tg.checked = !!S.hl;
   tg.addEventListener('change', function(){ S.hl = tg.checked; saveLocal(); mail.classList.toggle('hl-on', S.hl); legend.hidden = !S.hl; });
   var flSec = 0, flOn = false;
-  var flBtn = h('button', { class:'ar-btn', type:'button' }, 'Fluency Timer · مؤقت قراءة الطلاقة (00:00)');
+  var flBtn = h('button', { class:'ar-btn', type:'button' }, 'Fluency Timer');
   flBtn.addEventListener('click', function(){
-    if (flOn) { clearReadTimer(); flOn = false; flBtn.textContent = 'Fluency Timer · مؤقت قراءة الطلاقة (' + fmtSec(flSec) + ')'; }
-    else { flSec = 0; flOn = true; clearReadTimer(); readTimerId = setInterval(function(){ flSec++; flBtn.textContent = 'Stop Fluency Timer · إيقاف (' + fmtSec(flSec) + ')'; }, 1000); }
+    if (flOn) { clearReadTimer(); flOn = false; flBtn.textContent = 'Fluency timer (' + fmtSec(flSec) + ')'; }
+    else { flSec = 0; flOn = true; clearReadTimer(); readTimerId = setInterval(function(){ flSec++; flBtn.textContent = 'Stop timer (' + fmtSec(flSec) + ')'; }, 1000); }
   });
   return [
-    label('Step 3 · Second Reading (With Word Meanings)', 'الخطوة 3 · القراءة الثانية مع معاني الكلمات باللمس', h('span', { class:'tag' }, '~' + nW + ' words · نحو ' + nW + (nW % 100 === 10 ? ' كلمات' : ' كلمة'))),
+    label('Step 3 · Second Reading (With Word Meanings)', 'الخطوة 3', h('span', { class:'tag' }, '~' + nW + ' words')),
     r.introEn ? h('p', { class:'en', dir:'ltr', style:'font-size:14.5px;font-weight:600;color:var(--ink-2);text-align:left' }, r.introEn) : null,
-    h('p', { class:'muted', html:arHTML(r.intro) }),
+    r.introEn ? null : h('p', { class:'muted', html:arHTML(r.intro) }),
     h('div', { class:'mail-tools' },
-      h('label', { class:'toggle', for:'hlToggle' }, tg, h('span', {}, r.hlLabel || 'Highlight grammar · إظهار القاعدة')),
+      h('label', { class:'toggle', for:'hlToggle' }, tg, h('span', {}, r.hlLabel || 'Highlight grammar')),
       flBtn,
-      h('span', { class:'hint' }, 'Tap underlined words for meaning, Oxford ↗ & human audio · اضغط أي كلمة مسطّرة لمعناها ورابط أوكسفورد والنطق')),
+      h('span', { class:'hint' }, 'Tap underlined words for meaning, Oxford ↗ & human audio')),
     legend, mail
   ];
 }
@@ -1625,14 +1525,14 @@ function stListen1(ctl){
       return b;
     });
     gistBox = h('div', { style:'display:flex;flex-direction:column;gap:10px' },
-      qCard(h('div', {}, p.qEn ? h('p', { class:'q-en sm', dir:'ltr', style:'margin-bottom:6px' }, p.qEn) : null, h('p', { class:'q-ar' }, p.q)), { tag:'Stage 1 · Main Idea Check · سؤال الفكرة العامة' }),
+      qCard(h('div', {}, p.qEn ? h('p', { class:'q-en sm', dir:'ltr', style:'margin-bottom:6px' }, p.qEn) : null, h('p', { class:'q-ar' }, p.q)), { tag:'Stage 1 · Main Idea Check' }),
       h('div', { class:'opts' }, btns),
       fb);
   } else {
     ctl.set('إلى الأسئلة', true, function(){ S.listen1Done = true; touch(); nextStep(); });
   }
   return [
-    label('Listening · Stage 1 of 3 (Main Idea — No Transcript)', 'الاستماع ١ من ٣ · الفكرة العامة بدون النص المكتوب', h('span', { class:'tag' }, L.sourceTag || 'Audio Clip · مقطع صوتي')),
+    label('Listening · Stage 1 of 3 (Main Idea — No Transcript)', 'الاستماع ١ من ٣ · الفكرة العامة بدون النص المكتوب', h('span', { class:'tag' }, L.sourceTag || 'Audio Clip')),
     h('div', { class:'rtimer' },
       biNode('Step 1: Listen once in the source page for the main idea without looking at the transcript, then answer the main-idea question below.', 'الخطوة ١: استمع مرة واحدة للفكرة العامة بدون قراءة النص المكتوب، ثم أجب عن سؤال الفكرة العامة بالأسفل.'),
       tSpan),
@@ -1659,10 +1559,10 @@ function stListen3(ctl){
       h('p', { class:'xen' }, ins.ex2),
       arReveal(ins.arHtml, true)) : null;
   var shSec = 0, shOn = false;
-  var shBtn = h('button', { class:'ar-btn', type:'button' }, 'Shadowing Timer · مؤقت الترديد مع المتحدث (00:00)');
+  var shBtn = h('button', { class:'ar-btn', type:'button' }, 'Shadowing Timer');
   shBtn.addEventListener('click', function(){
-    if (shOn) { clearReadTimer(); shOn = false; shBtn.textContent = 'Shadowing Timer · مؤقت الترديد (' + fmtSec(shSec) + ')'; }
-    else { shSec = 0; shOn = true; clearReadTimer(); readTimerId = setInterval(function(){ shSec++; shBtn.textContent = 'Stop Shadowing · إيقاف (' + fmtSec(shSec) + ')'; }, 1000); }
+    if (shOn) { clearReadTimer(); shOn = false; shBtn.textContent = 'Shadowing timer (' + fmtSec(shSec) + ')'; }
+    else { shSec = 0; shOn = true; clearReadTimer(); readTimerId = setInterval(function(){ shSec++; shBtn.textContent = 'Stop timer (' + fmtSec(shSec) + ')'; }, 1000); }
   });
   /* Real recordings: the transcript belongs to the source, so it is read there, not copied here. */
   if (!paras.length) {
@@ -1672,7 +1572,7 @@ function stListen3(ctl){
         h('p', { class:'en-p', dir:'ltr' }, 'Now open the transcript on the source page and read it while you listen again. Check anything you missed, then replay the clip and shadow the speakers aloud.'),
         h('p', {}, 'الآن افتح النص المكتوب في صفحة المصدر، واقرأه وأنت تستمع مرة أخرى لتراجع ما فاتك، ثم أعد تشغيل المقطع وردّد مع المتحدثين بصوت مسموع.'),
         L.url ? h('a', { class:'btn sm', href:L.url, target:'_blank', rel:'noopener noreferrer', style:'align-self:flex-start' }, biBtn('Open Transcript & Clip ↗', 'افتح النص والمقطع في صفحة المصدر ↗')) : null,
-        L.sourceMeta ? h('p', { class:'fine', dir:'ltr' }, 'Source · المصدر: ' + L.sourceMeta + (L.speakers ? ' · ' + L.speakers : '')) : null),
+        L.sourceMeta ? h('p', { class:'fine', dir:'ltr' }, 'Source: ' + L.sourceMeta + (L.speakers ? ' · ' + L.speakers : '')) : null),
       insightBox,
       h('div', { class:'mail-tools' }, shBtn)
     ];
@@ -1680,14 +1580,14 @@ function stListen3(ctl){
   var bodyHtml = paras.map(function(p){ return '<p>' + parseMarkup(p) + '</p>'; }).join('');
   var mail = h('article', { class:'mail' + (S.hl ? ' hl-on' : ''), 'aria-label':'Audio Transcript · النص المكتوب للمقطع' },
     h('div', { class:'mail-meta' },
-      h('div', {}, h('span', { class:'k' }, 'SOURCE'), L.sourceMeta || 'Audio Clip · مقطع الاستماع'),
+      h('div', {}, h('span', { class:'k' }, 'SOURCE'), L.sourceMeta || 'Audio Clip'),
       h('div', {}, h('span', { class:'k' }, 'SPEAKERS'), L.speakers || 'Dialogue'),
       h('div', {}, h('span', { class:'k' }, 'TITLE'), h('span', { class:'subj' }, L.title || 'Transcript'))),
     h('div', { class:'mail-body', dir:'ltr', html:bodyHtml }));
   var legend = h('div', { class:'legend', hidden:!S.hl },
-    h('span', { class:'lg s' }, L.lg1 || 'Target Form 1 · الصيغة ١'),
-    h('span', { class:'lg c' }, L.lg2 || 'Target Form 2 · الصيغة ٢'),
-    h('span', { class:'lg t' }, 'Key Signal · علامة مفتاحية'));
+    h('span', { class:'lg s' }, L.lg1 || 'Target Form 1'),
+    h('span', { class:'lg c' }, L.lg2 || 'Target Form 2'),
+    h('span', { class:'lg t' }, 'Key Signal'));
   var tg = h('input', { type:'checkbox', id:'hlToggleL' }); tg.checked = !!S.hl;
   tg.addEventListener('change', function(){ S.hl = tg.checked; saveLocal(); mail.classList.toggle('hl-on', S.hl); legend.hidden = !S.hl; });
   return [
@@ -1698,9 +1598,9 @@ function stListen3(ctl){
       L.url ? h('a', { class:'btn sm out', href:L.url, target:'_blank', rel:'noopener noreferrer', style:'align-self:flex-start' }, biBtn('Replay Clip for Shadowing ↗', 'أعد تشغيل المقطع للترديد مع المتحدث ↗')) : null),
     insightBox,
     h('div', { class:'mail-tools' },
-      h('label', { class:'toggle', for:'hlToggleL' }, tg, h('span', {}, 'Highlight grammar · إظهار القاعدة')),
+      h('label', { class:'toggle', for:'hlToggleL' }, tg, h('span', {}, 'Highlight grammar')),
       shBtn,
-      h('span', { class:'hint' }, 'Tap underlined words for meaning, Oxford ↗ & human audio · اضغط أي كلمة مسطّرة لمعناها ونطقها')),
+      h('span', { class:'hint' }, 'Tap underlined words for meaning, Oxford ↗ & human audio')),
     legend,
     mail
   ];
@@ -1715,13 +1615,12 @@ function startQuiz(){ var order = shuffle(D.quiz.map(function(_, i){ return i; }
 function stQuizIntro(ctl){ var best = S.quiz.best;
   ctl.set(best == null ? 'ابدأ الاختبار' : 'أعد الاختبار', true, startQuiz);
   return h('div', { class:'qi' },
-    h('h1', { class:'bi-h' }, h('span', { class:'en', dir:'ltr', style:'color:#fff' }, 'Stage 6 · Short Quiz & Error Analysis'), h('small', { style:'color:var(--honey)' }, 'المرحلة 6 · اختبار قصير وتحليل الأخطاء')),
+    h('h1', { class:'bi-h' }, h('span', { class:'en', dir:'ltr', style:'color:#fff' }, 'Stage 6 · Short Quiz & Error Analysis'), h('small', { style:'color:var(--honey)' }, 'المرحلة 6')),
     h('p', { class:'en', dir:'ltr', style:'text-align:left;color:#fff;font-weight:600' }, '10 questions on vocabulary and grammar. Score 80% or higher to pass, followed by an analysis of your lesson mistakes and their causes.'),
-    h('p', {}, '10 أسئلة من المفردات والقواعد. النجاح من 80%، يليه تحليل لأخطاء الدرس وأسبابها.'),
     h('div', { class:'qi-stats' },
-      h('div', { class:'qs' }, h('b', {}, String(D.quiz.length)), h('span', {}, 'Questions · أسئلة')),
-      h('div', { class:'qs' }, h('b', { dir:'ltr' }, '80%'), h('span', {}, 'To Pass · للنجاح')),
-      h('div', { class:'qs' }, h('b', { dir:'ltr' }, best == null ? '—' : best + '/' + D.quiz.length), h('span', {}, 'Best · أفضل نتيجة'))));
+      h('div', { class:'qs' }, h('b', {}, String(D.quiz.length)), h('span', {}, 'Questions')),
+      h('div', { class:'qs' }, h('b', { dir:'ltr' }, '80%'), h('span', {}, 'To Pass')),
+      h('div', { class:'qs' }, h('b', { dir:'ltr' }, best == null ? '—' : best + '/' + D.quiz.length), h('span', {}, 'Best'))));
 }
 function stQuizQ(n, ctl){ if (!Q) { setTimeout(function(){ goStep(0); }, 0); return h('p', {}, ''); }
   var it = Q.items[n], last = n === Q.items.length - 1;
@@ -1764,7 +1663,7 @@ function renderErrorAnalysis(quizWrongs){
       h('h3', { class:'bi-h', style:'font-size:16px' }, h('span', { class:'en', dir:'ltr' }, 'Lesson Error Analysis'), h('small', {}, 'تحليل أخطاء الدرس وأسبابها')),
       h('div', { class:'fb' }, h('span', { class:'fb-ic' }, ico('check')),
         h('div', { class:'fb-t' },
-          h('b', {}, 'Zero Mistakes Across the Lesson! · لا توجد أخطاء مسجّلة في الدرس!'),
+          h('b', {}, 'Zero Mistakes Across the Lesson!'),
           h('p', { class:'fb-en' }, 'You used today\'s grammar correctly in every exercise and spelled the recall words accurately.'),
           arReveal('أصبت في قاعدة اليوم في كل التمارين، وأتقنت إملاء كلمات الاسترجاع.', false))));
   }
@@ -1830,18 +1729,18 @@ var SIG_RE = /\b(usually|always|often|sometimes|never|every\s+(?:day|morning|aft
 var CONT_RE = /\b(?:am|is|are|i'm|you're|we're|they're|he's|she's|it's)\s+(?:not\s+|also\s+|still\s+|really\s+)?([a-z]+ing)\b/gi;
 var ING_NOT = ['interesting','boring','amazing','exciting','morning','evening','everything','nothing','something','anything','thing','king','spring','ring','sing','bring','during','ceiling','building','wedding','string','swing','wing','sibling','darling'];
 var WRITING_TYPOS = {
-  studing: { right:'studying', why:'Keep y before adding -ing (study → studying). · تبقى الـ y عند إضافة ing.' },
-  writting: { right:'writing', why:'Drop silent -e without doubling t (write → writing). · نحذف e الصامتة دون مضاعفة t.' },
-  rainning: { right:'raining', why:'Do not double n after two vowels ai (rain → raining). · لا نضاعف n لأن قبلها حرفي علة.' },
-  butefull: { right:'beautiful', why:'Suffix -ful ends with one l (beautiful). · المقطع ful ينتهي بلام واحدة.' },
-  beautifull: { right:'beautiful', why:'Suffix -ful ends with one l (beautiful). · المقطع ful ينتهي بلام واحدة.' },
-  scintist: { right:'scientist', why:'Remember scie- in scientist. · انتبه لترتيب حروف scientist.' },
-  temprature: { right:'temperature', why:'Remember the middle -era- in temperature. · لا تنسَ era في وسط temperature.' },
-  carefull: { right:'careful', why:'Suffix -ful ends with one l (careful). · المقطع ful ينتهي بلام واحدة.' },
-  usefull: { right:'useful', why:'Suffix -ful ends with one l (useful). · المقطع ful ينتهي بلام واحدة.' },
-  helpfull: { right:'helpful', why:'Suffix -ful ends with one l (helpful). · المقطع ful ينتهي بلام واحدة.' },
-  writeing: { right:'writing', why:'Drop the silent -e before -ing (write → writing). · نحذف e الصامتة قبل ing.' },
-  studys: { right:'studies', why:'Consonant + y → -ies with he / she / it (study → studies). · إذا سبق y حرف ساكن صارت ies.' }
+  studing: { right:'studying', why:'Keep y before adding -ing (study → studying).' },
+  writting: { right:'writing', why:'Drop silent -e without doubling t (write → writing).' },
+  rainning: { right:'raining', why:'Do not double n after two vowels ai (rain → raining).' },
+  butefull: { right:'beautiful', why:'Suffix -ful ends with one l (beautiful).' },
+  beautifull: { right:'beautiful', why:'Suffix -ful ends with one l (beautiful).' },
+  scintist: { right:'scientist', why:'Remember scie- in scientist.' },
+  temprature: { right:'temperature', why:'Remember the middle -era- in temperature.' },
+  carefull: { right:'careful', why:'Suffix -ful ends with one l (careful).' },
+  usefull: { right:'useful', why:'Suffix -ful ends with one l (useful).' },
+  helpfull: { right:'helpful', why:'Suffix -ful ends with one l (helpful).' },
+  writeing: { right:'writing', why:'Drop the silent -e before -ing (write → writing).' },
+  studys: { right:'studies', why:'Consonant + y → -ies with he / she / it (study → studies).' }
 };
 
 function analyze(t){ var text = fixQuotes(t);
@@ -1866,37 +1765,37 @@ function localWritingCheck(text){
   var gMist = [], sMist = [];
   if (/\b(?:I\s+am|He\s+is|She\s+is|We\s+are|They\s+are)\s+(?:work|study|go|live|sleep|wake|check|measure|miss)\b/i.test(text)) {
     var m1 = text.match(/\b(?:I\s+am|He\s+is|She\s+is|We\s+are|They\s+are)\s+(?:work|study|go|live|sleep|wake|check|measure|miss)\b/i)[0];
-    gMist.push({ wrong:m1, right:m1.replace(/\b(He|She)\s+is\s+(\w+)/i, '$1 $2s').replace(/\b(am|is|are)\s+/i, ''), why:'Do not put am/is/are before a base verb in Present Simple. · لا نضع am/is/are قبل الفعل الأصلي في المضارع البسيط.' });
+    gMist.push({ wrong:m1, right:m1.replace(/\b(He|She)\s+is\s+(\w+)/i, '$1 $2s').replace(/\b(am|is|are)\s+/i, ''), why:'Do not put am/is/are before a base verb in Present Simple.' });
   }
   if (/\b(?:I|He|She|We|They)\s+(?:working|studying|going|living|sleeping|sitting|writing|reading|learning)\b/i.test(text)) {
     var m2 = text.match(/\b(?:I|He|She|We|They)\s+(?:working|studying|going|living|sleeping|sitting|writing|reading|learning)\b/i)[0];
-    gMist.push({ wrong:m2, right:m2.replace(/^(\w+)\s+/, '$1 am/is/are '), why:'Present Continuous needs am / is / are before verb-ing. · المضارع المستمر يحتاج am / is / are قبل الفعل ing.' });
+    gMist.push({ wrong:m2, right:m2.replace(/^(\w+)\s+/, '$1 am/is/are '), why:'Present Continuous needs am / is / are before verb-ing.' });
   }
   if (/\b(?:am|is|are|'m|'s|'re)\s+(?:knowing|needing|wanting|understanding|loving)\b/i.test(text)) {
     var m3 = text.match(/\b(?:am|is|are|'m|'s|'re)\s+(?:knowing|needing|wanting|understanding|loving)\b/i)[0];
-    gMist.push({ wrong:m3, right:'know / need / want / understand', why:'Stative verbs do not take -ing. · أفعال الحالة لا تأخذ ing.' });
+    gMist.push({ wrong:m3, right:'know / need / want / understand', why:'Stative verbs do not take -ing.' });
   }
   if (/\bi\b/.test(text)) {
-    sMist.push({ wrong:'i', right:'I', why:'Always write the pronoun "I" with a capital letter. · ضمير المتكلم I يُكتب دائمًا بحرف كبير.' });
+    sMist.push({ wrong:'i', right:'I', why:'Always write the pronoun "I" with a capital letter.' });
   }
   Object.keys(WRITING_TYPOS).forEach(function(k){
     var re = new RegExp('\\b' + k + '\\b', 'i');
     if (re.test(text)) sMist.push({ wrong:k, right:WRITING_TYPOS[k].right, why:WRITING_TYPOS[k].why });
   });
   if (a.runOn) {
-    sMist.push({ wrong:'One long connected sentence', right:'4 separate sentences with periods (.)', why:'Split long sentences with a period (.) and start the next sentence with a capital letter. · قسّم الجملة الطويلة بنقطة وابدأ الجملة التالية بحرف كبير.' });
+    sMist.push({ wrong:'One long connected sentence', right:'4 separate sentences with periods (.)', why:'Split long sentences with a period (.) and start the next sentence with a capital letter.' });
   }
   var activeCks = (D.writing && Array.isArray(D.writing.checks)) ? D.writing.checks : CHECKS;
   var met = activeCks.filter(function(c){ return c.ok(a, text); }).length, all = met >= activeCks.length, four = activeCks.length === 4;
   var score = Math.max(4, Math.min(10, 6 + met - gMist.length - Math.min(2, sMist.length)));
   return {
     score: score,
-    praise: all ? (four ? 'Great job meeting all 4 task criteria! · أحسنت، حققت جميع معايير المهمة الأربعة!' : 'Great job meeting all the task criteria! · أحسنت، حققت جميع معايير المهمة!') : 'Good effort practicing today\'s grammar and vocabulary! · محاولة طيبة في استخدام قاعدة الدرس وكلماته.',
+    praise: all ? (four ? 'Great job meeting all 4 task criteria!' : 'Great job meeting all the task criteria!') : 'Good effort practicing today\'s grammar and vocabulary!',
     grammarMistakes: gMist,
     spellingMistakes: sMist,
     mistakes: gMist.concat(sMist),
     corrected: '',
-    next: !all ? (four ? 'Try to complete all 4 checklist items above for a higher score. · حاول استيفاء جميع عناصر القائمة الأربعة لرفع الدرجة.' : 'Try to complete all the checklist items above for a higher score. · حاول استيفاء جميع عناصر القائمة لرفع الدرجة.') : 'Keep separating each sentence clearly with a period and capital letter. · استمر في فصل الجمل بنقطة وحرف كبير.'
+    next: !all ? (four ? 'Try to complete all 4 checklist items above for a higher score.' : 'Try to complete all the checklist items above for a higher score.') : 'Keep separating each sentence clearly with a period and capital letter.'
   };
 }
 
@@ -1907,8 +1806,8 @@ function stWriting(ctl){
   var checks = h('ul', { class:'checks', 'aria-live':'polite' }), count = h('p', { class:'wcount' }), runOnWarn = h('div', { class:'tip', hidden:true }), fbBox = h('div', { hidden:true, 'aria-live':'polite' });
   function paint(){ var a = analyze(ta.value), text = fixQuotes(ta.value);
     var activeCks = (D.writing && Array.isArray(D.writing.checks)) ? D.writing.checks : CHECKS;
-    put(checks, activeCks.map(function(c){ var on = c.ok(a, text); return h('li', { class:on ? 'on' : '' }, h('span', { class:'cb' }, on ? ico('check') : null), h('div', { class:'ck-t' }, h('span', { class:'ck-en' }, c.tEn), h('span', { html:arHTML(c.t) }), c.ex ? h('span', { class:'ck-ex', dir:'ltr', lang:'en' }, c.ex) : null, (c.k === 'vocab' && a.used.length) ? h('span', { class:'used' }, a.used.map(function(u){ return h('span', {}, u); })) : null)); }));
-    count.textContent = 'Words · الكلمات: ' + a.words + ' · Separate Sentences · الجمل المنفصلة: ' + a.sentences + ' / 4';
+    put(checks, activeCks.map(function(c){ var on = c.ok(a, text); return h('li', { class:on ? 'on' : '' }, h('span', { class:'cb' }, on ? ico('check') : null), h('div', { class:'ck-t' }, h('span', { class:'ck-en' }, c.tEn || c.t), c.ex ? h('span', { class:'ck-ex', dir:'ltr', lang:'en' }, c.ex) : null, (c.k === 'vocab' && a.used.length) ? h('span', { class:'used' }, a.used.map(function(u){ return h('span', {}, u); })) : null)); }));
+    count.textContent = 'Words: ' + a.words + ' · Separate sentences: ' + a.sentences + ' / 4';
     runOnWarn.hidden = !a.runOn;
     if (a.runOn) put(runOnWarn, biNode('Tip: Split your writing into at least 4 separate sentences ending with a period (.) rather than one long connected sentence.', 'تنبيه: قسّم كتابتك إلى 4 جمل منفصلة تنتهي كل منها بنقطة (.) بدل جملة واحدة طويلة موصولة.'));
     return a; }
@@ -1917,25 +1816,25 @@ function stWriting(ctl){
   var fix = h('button', { class:'btn', type:'button' }, ico('spark'), biBtn('Instant Check (Grammar vs. Spelling)', 'تصحيح فوري (يفصل القواعد عن الإملاء)'));
   var copy = h('button', { class:'btn out', type:'button' }, ico('copy'), biBtn('Copy for Chat', 'نسخ للمحادثة'));
   fix.addEventListener('click', function(){ correctWriting(ta, fix, fbBox); });
-  copy.addEventListener('click', function(){ var text = ta.value.trim(); if (!text) { toast('Paragraph is empty. · الفقرة فارغة.'); return; }
-    var payload = 'صحّح لي فقرة درس «' + (D.en || lessonTag(curLessonId)) + '» من جواز الإنجليزية (مع فصل أخطاء الإملاء عن القواعد):\n\n' + text, fallback = function(){ ta.focus(); ta.select(); toast('Text selected — copy from your device menu. · النص محدد، وتقدر تنسخه من قائمة الجهاز.'); };
-    try { navigator.clipboard.writeText(payload).then(function(){ toast('Copied! Paste it in chat. · نُسخت الفقرة، والصقها لي في المحادثة.'); }, fallback); } catch (e) { fallback(); } });
-  ctl.set(S.writingDone ? 'التالي' : 'إنهاء المهمة', true, function(){ var a = analyze(ta.value); if (a.sentences < 4) { toast('Write at least 4 separate sentences ending with a period (.). · نحتاج 4 جمل منفصلة على الأقل تنتهي بنقطة.'); return; } S.writing.text = ta.value; S.writingDone = true; touch(); updateProgress(); nextStep(); });
+  copy.addEventListener('click', function(){ var text = ta.value.trim(); if (!text) { toast('Paragraph is empty.'); return; }
+    var payload = 'صحّح لي فقرة درس «' + (D.en || lessonTag(curLessonId)) + '» من جواز الإنجليزية (مع فصل أخطاء الإملاء عن القواعد):\n\n' + text, fallback = function(){ ta.focus(); ta.select(); toast('Text selected — copy from your device menu.'); };
+    try { navigator.clipboard.writeText(payload).then(function(){ toast('Copied! Paste it in chat.'); }, fallback); } catch (e) { fallback(); } });
+  ctl.set(S.writingDone ? 'التالي' : 'إنهاء المهمة', true, function(){ var a = analyze(ta.value); if (a.sentences < 4) { toast('Write at least 4 separate sentences ending with a period (.).'); return; } S.writing.text = ta.value; S.writingDone = true; touch(); updateProgress(); nextStep(); });
   if (S.writing.fb) { fbBox.hidden = false; paintFeedback(fbBox, S.writing.fb); }
   paint();
   var modelSrc = W.modelMarked || W.model || '', modelLegend = writingModelLegend(W, modelSrc);
   return [
-    label('Stage 5 of 6 · Writing', 'المرحلة 5 من 6 · الكتابة'),
+    label('Stage 5 of 6 · Writing', 'المرحلة 5 من 6'),
     h('div', { class:'task' },
       D.writing.taskEn ? h('p', { class:'task-en' }, D.writing.taskEn) : null,
-      h('h2', { class:'task-ar' }, D.writing.task),
+      h('p', { class:'task-ar', dir:'rtl', lang:'ar' }, D.writing.task),
       checks),
     ta, count, runOnWarn,
     h('div', { class:'wbtns' }, fix, copy),
-    SAMPLE ? h('p', { class:'fine' }, 'Instant check separates Grammar & Usage from Spelling mistakes. · التصحيح الفوري يفصل أخطاء القواعد عن الإملاء.') : null,
+    SAMPLE ? h('p', { class:'fine' }, 'Instant check separates Grammar & Usage from Spelling mistakes.') : null,
     fbBox,
     h('details', { class:'model' },
-      h('summary', {}, 'Model Answer · نموذج إجابة'),
+      h('summary', {}, 'Model Answer'),
       h('p', { class:'model-t hl-on', dir:'ltr', html:parseMarkup(modelSrc) }),
       modelLegend ? h('p', { class:'fine' }, modelLegend) : null)
   ];
@@ -1944,7 +1843,7 @@ function stWriting(ctl){
    ولا سطر لنموذج بلا ألوان (u0l4). */
 function writingModelLegend(W, src){
   if (W.legendEn || W.legendAr) return [W.legendEn, W.legendAr].filter(Boolean).join(' · ');
-  return /<<[sc]:/.test(src || '') ? 'Highlighted words show today\'s grammar and lesson words · المظلَّل يبيّن قاعدة اليوم وكلماته' : '';
+  return /<<[sc]:/.test(src || '') ? 'Highlighted words show today\'s grammar and lesson words' : '';
 }
 function paintFeedback(box, fb){
   var gMist = Array.isArray(fb.grammarMistakes) ? fb.grammarMistakes : (Array.isArray(fb.mistakes) ? fb.mistakes.filter(function(m){ return m.kind !== 'spelling'; }) : []);
@@ -1957,15 +1856,15 @@ function paintFeedback(box, fb){
     }));
   }
   put(box, h('div', { class:'fbk' },
-    h('div', { class:'fbk-top' }, ring(fb.score, 10), h('div', {}, h('p', { class:'st-lbl' }, 'Teacher Feedback · تصحيح المعلم'), (String(fb.praise || '').indexOf(' · ') >= 0 ? biNode(fb.praise.split(' · ')[0], fb.praise.split(' · ')[1]) : h('p', { style:'font-weight:600', html:arHTML(fb.praise) })))),
+    h('div', { class:'fbk-top' }, ring(fb.score, 10), h('div', {}, h('p', { class:'st-lbl' }, 'Teacher Feedback'), (String(fb.praise || '').indexOf(' · ') >= 0 ? biNode(fb.praise.split(' · ')[0], fb.praise.split(' · ')[1]) : h('p', { style:'font-weight:600', html:arHTML(fb.praise) })))),
     h('div', { class:'fbk-sec' },
-      h('h3', {}, '1. Grammar & Usage · القواعد والاستخدام (' + gMist.length + ')'),
-      gMist.length ? renderList(gMist) : h('p', { style:'font-weight:600;color:var(--ok-ink);font-size:13.5px' }, 'No grammar mistakes found! · لا توجد أخطاء في القواعد والتركيب.')),
+      h('h3', {}, '1. Grammar and usage (' + gMist.length + ')'),
+      gMist.length ? renderList(gMist) : h('p', { style:'font-weight:600;color:var(--ok-ink);font-size:13.5px' }, 'No grammar mistakes found!')),
     h('div', { class:'fbk-sec spell' },
-      h('h3', {}, '2. Spelling & Punctuation · الإملاء وعلامات الترقيم (' + sMist.length + ')'),
-      sMist.length ? renderList(sMist) : h('p', { style:'font-weight:600;color:var(--ok-ink);font-size:13.5px' }, 'Clean spelling and punctuation! · الإملاء وعلامات الترقيم سليمة.')),
-    fb.corrected ? h('div', { class:'fbk-corr' }, h('h3', {}, 'Corrected Paragraph · الفقرة بعد التصحيح'), h('p', { dir:'ltr' }, fb.corrected)) : null,
-    fb.next ? h('p', { class:'fbk-next', html:'<b>Next Step · الخطوة التالية: </b>' + arHTML(fb.next) }) : null));
+      h('h3', {}, '2. Spelling and punctuation (' + sMist.length + ')'),
+      sMist.length ? renderList(sMist) : h('p', { style:'font-weight:600;color:var(--ok-ink);font-size:13.5px' }, 'Clean spelling and punctuation!')),
+    fb.corrected ? h('div', { class:'fbk-corr' }, h('h3', {}, 'Corrected Paragraph'), h('p', { dir:'ltr' }, fb.corrected)) : null,
+    fb.next ? h('p', { class:'fbk-next', html:'<b>Next step: </b>' + arHTML(fb.next) }) : null));
 }
 
 /* done screens */
@@ -1974,7 +1873,7 @@ var PART_SCORE = {
   vocab:function(){ return scoreOf(IDS.vg); },
   grammar:function(){ return scoreOf([].concat(IDS.gA, IDS.gB, IDS.gC, IDS.gD)); },
   reading:function(){ return scoreOf((D.listening && !D.reading) ? IDS.lq : IDS.rq); },
-  writing:function(){ return S.writing.fb ? 'Paragraph score: ' + S.writing.fb.score + '/10 · تقييم الفقرة: ' + S.writing.fb.score + ' من 10' : 'Paragraph saved · الفقرة محفوظة'; },
+  writing:function(){ return S.writing.fb ? 'Paragraph score: ' + S.writing.fb.score + '/10' : 'Paragraph saved'; },
   quiz:function(){ return S.quiz.best != null ? S.quiz.best + ' of ' + D.quiz.length + ' · ' + S.quiz.best + ' من ' + D.quiz.length : ''; }
 };
 function scoreOf(ids){ var c = (ids || []).filter(function(id){ return S.ans[id] && S.ans[id].c; }).length, a = (ids || []).filter(function(id){ return S.ans[id]; }).length; return c + ' correct of ' + a + ' · ' + c + ' صحيحة من ' + a; }
@@ -1982,16 +1881,16 @@ function stDone(k, ctl){ updateProgress(); var p = partOf(k), idx = PARTS.indexO
   if (all) ctl.set('رجوع للدرس', true, closePlayer);
   else if (nxt) ctl.set('التالي: ' + nxt.ar, true, function(){ openPart(nxt.k); });
   else ctl.set('رجوع للدرس', true, closePlayer);
-  var redo = (k !== 'quiz' && k !== 'writing') ? h('button', { class:'link', type:'button', on:{ click:function(){ resetPart(k); } } }, 'Redo exercises in this stage · إعادة أسئلة هذه المرحلة') : null;
+  var redo = (k !== 'quiz' && k !== 'writing') ? h('button', { class:'link', type:'button', on:{ click:function(){ resetPart(k); } } }, 'Redo exercises in this stage') : null;
   return h('div', { class:'fin' }, h('span', { class:'done-ic pop' }, all ? ico('star') : ico('check')),
     h('h1', { class:'bi-h' },
       h('span', { class:'en', dir:'ltr' }, all ? 'Lesson Complete!' : (isDone ? p.fullEn + ' Complete!' : 'End of ' + p.fullEn)),
       h('small', {}, all ? 'اكتمل الدرس بمراحله الست!' : (isDone ? 'اكتملت مرحلة ' + p.fullAr : 'وصلت لنهاية ' + p.fullAr))),
-    h('p', {}, all ? 'All 6 stages finished! · ست مراحل كاملة. يظهر لك الدرس التالي في الرئيسية غدًا، أو اختره الآن من قائمة الدروس.' : (isDone ? PART_SCORE[k]() : 'Some questions in this stage are still unanswered. · بقيت أسئلة ما جاوبت عليها في هذه المرحلة. ارجع لها من الخطوة السابقة.')),
+    h('p', {}, all ? 'All 6 stages finished!' : (isDone ? PART_SCORE[k]() : 'Some questions in this stage are still unanswered.')),
     all ? penguin(84, 119) : null, redo);
 }
 function resetPart(k){ var ids = k === 'recall' ? IDS.rc : k === 'vocab' ? IDS.vg : k === 'grammar' ? [].concat(IDS.gA, IDS.gB, IDS.gC, IDS.gD) : k === 'reading' ? ((D.listening && !D.reading) ? IDS.lq : IDS.rq) : [];
-  ids.forEach(function(id){ delete S.ans[id]; }); if (k === 'vocab') { M = null; } touch(); P.i = 0; S.step[k] = 0; saveLocal(); toast('Stage reset · رجعت أسئلة المرحلة من البداية'); render(); }
+  ids.forEach(function(id){ delete S.ans[id]; }); if (k === 'vocab') { M = null; } touch(); P.i = 0; S.step[k] = 0; saveLocal(); toast('Stage reset'); render(); }
 function stExpressIntro(ctl){
   ctl.enable('ابدأ');
   return h('div', { class:'intro' },
@@ -2017,7 +1916,7 @@ function stIrrDrill(st, ctl){
     h('div', { class:'irr-inputs' },
       h('div', { class:'irr-field' }, h('label', {}, 'Past Simple (V2)'), inPast),
       h('div', { class:'irr-field' }, h('label', {}, 'Past Participle (V3)'), inPp))
-  ), { tag:'Irregular Verbs · الأفعال الشاذة' });
+  ), { tag:'Irregular Verbs' });
 
   function matchForm(typed, target){
     var nt = norm(typed);
@@ -2045,8 +1944,8 @@ function stIrrDrill(st, ctl){
     fb.hidden = false;
     var whyEn = 'Three forms: ' + v.base + ' → ' + v.past + ' → ' + v.pp + ' (Next review in +' + days + 'd).';
     var whyAr = 'الصيغ الثلاث للفعل (' + v.ar + '): ' + v.base + ' → ' + v.past + ' → ' + v.pp + ' · المراجعة القادمة بعد ' + days + ' يوم.';
-    var cNode = fbCard(ok, whyAr, null, ok ? null : ['Correct forms · التصريف الصحيح', v.base + ' → ' + v.past + ' → ' + v.pp], whyEn);
-    cNode.querySelector('.fb-t').append(h('div', { class:'audio-row' }, sayBtn(v.base, 'Human Pronunciation · نطق بشري'), oxBtn(v.base)));
+    var cNode = fbCard(ok, whyAr, null, ok ? null : ['Correct forms', v.base + ' → ' + v.past + ' → ' + v.pp], whyEn);
+    cNode.querySelector('.fb-t').append(h('div', { class:'audio-row' }, sayBtn(v.base, 'Human Pronunciation'), oxBtn(v.base)));
     put(fb, cNode);
     ctl.enable('التالي');
   }
@@ -2098,12 +1997,12 @@ function stSessionDone(k, ctl){
   var titleEn = k === 'express' ? '15-Min Express Review Logged!' : k === 'irregular' ? 'Irregular Verbs Practice Complete!' : isRev ? 'Error Lab & Review Complete!' : 'Flashcards Complete';
   var titleAr = k === 'express' ? 'سُجّلت جلسة الوضع المختصر (+١٥ دقيقة)!' : k === 'irregular' ? 'أنهيت تدريب الأفعال الشاذة!' : isRev ? 'أنهيت جلسة مختبر الأخطاء والمراجعة!' : 'أنهيت البطاقات';
   var desc = k === 'express'
-    ? 'Added +15 minutes to your study hours as a review session (not a completed lesson). Total express sessions: ' + (G.expressSessions || 1) + '. · أُضيفت ١٥ دقيقة لساعات دراستك كجلسة مراجعة (لا تُحسب درسًا مكتملًا).'
+    ? 'Added +15 minutes to your study hours as a review session (not a completed lesson). Total express sessions: ' + (G.expressSessions || 1) + '.'
     : k === 'irregular'
-    ? 'Your Spaced Repetition intervals (+1d, +3d, +7d, +30d) have been updated. · تحدّثت مواعيد التكرار المتباعد للأفعال التي تدرّبت عليها.'
+    ? 'Your Spaced Repetition intervals (+1d, +3d, +7d, +30d) have been updated.'
     : isRev
-    ? (left ? left + ' item(s) still due today. Error Lab priorities updated. · بقي ' + left + ' مستحقة اليوم، وتحدّثت أولويات مختبر الأخطاء.' : 'Nothing else is due today. Correct answers come back later on the spaced schedule. · لا شيء مستحق اليوم، والأسئلة التي أصبت فيها تعود في مواعيدها المتباعدة.')
-    : 'Words marked "Review later" will appear first next time. · الكلمات التي اخترت «أراجعها لاحقًا» تظهر لك أولًا في المرة القادمة.';
+    ? (left ? left + ' item(s) still due today. Error Lab priorities updated.' : 'Nothing else is due today. Correct answers come back later on the spaced schedule.')
+    : 'Words marked "Review later" will appear first next time.';
   return h('div', { class:'fin' }, h('span', { class:'done-ic pop' }, ico('check')),
     h('h1', { class:'bi-h' }, h('span', { class:'en', dir:'ltr' }, titleEn), h('small', {}, titleAr)),
     h('p', {}, desc));
@@ -2171,16 +2070,16 @@ function computeDashboardStats(){
 }
 function openDashboard(){
   var st = computeDashboardStats();
-  function nAns(n){ return n + ' answer(s) across lessons · من ' + n + ' إجابة في الدروس'; }
+  function nAns(n){ return n + ' answer(s) across lessons'; }
   var skills = [
-    { en:'Reading · القراءة', pct:st.readPct, cls:'ok', subEn:st.readN ? nAns(st.readN) : 'Comprehension questions in reading lessons', subAr:st.readN ? '' : 'أسئلة الفهم في دروس القراءة' },
-    { en:'Listening · الاستماع', pct:st.listenPct, cls:'ok', subEn:st.listenN ? nAns(st.listenN) : 'Questions in listening lessons', subAr:st.listenN ? '' : 'أسئلة دروس الاستماع' },
-    { en:'Writing · الكتابة', pct:null, cls:'acc', subEn:st.writingDone + ' writing task(s) done. A score appears once real correction is available.', subAr:'أنجزت ' + st.writingDone + ' من مهام الكتابة، وتظهر الدرجة حين يتوفر تصحيح حقيقي.' },
-    { en:'Speaking (Cambly) · التحدث', pct:null, cls:'acc',
+    { en:'Reading', pct:st.readPct, cls:'ok', subEn:st.readN ? nAns(st.readN) : 'Comprehension questions in reading lessons', subAr:st.readN ? '' : 'أسئلة الفهم في دروس القراءة' },
+    { en:'Listening', pct:st.listenPct, cls:'ok', subEn:st.listenN ? nAns(st.listenN) : 'Questions in listening lessons', subAr:st.listenN ? '' : 'أسئلة دروس الاستماع' },
+    { en:'Writing', pct:null, cls:'acc', subEn:st.writingDone + ' writing task(s) done. A score appears once real correction is available.', subAr:'أنجزت ' + st.writingDone + ' من مهام الكتابة، وتظهر الدرجة حين يتوفر تصحيح حقيقي.' },
+    { en:'Speaking (Cambly)', pct:null, cls:'acc',
       subEn: st.speakSessions ? (st.speakSessions + ' Cambly session(s) · ' + st.speakPhrases + ' card phrases used') : 'Measured by your Cambly tutor in the first session',
       subAr: st.speakSessions ? (st.speakSessions + ' جلسات كامبلي · استُخدمت ' + st.speakPhrases + ' عبارة') : 'يقيسه معلم كامبلي في أول جلسة' },
-    { en:'Grammar · القواعد', pct:st.gramPct, cls:'', subEn:st.gramN ? nAns(st.gramN) : 'Grammar exercises in every lesson', subAr:st.gramN ? '' : 'تمارين القواعد في كل درس' },
-    { en:'Vocabulary & Spelling · المفردات والإملاء', pct:st.vocPct, cls:'', subEn:(st.vocN ? nAns(st.vocN) + ' · ' : '') + st.irrMastered + '/60 irregular verbs steady', subAr:'ثبت ' + st.irrMastered + ' من ٦٠ فعلًا شاذًا' }
+    { en:'Grammar', pct:st.gramPct, cls:'', subEn:st.gramN ? nAns(st.gramN) : 'Grammar exercises in every lesson', subAr:st.gramN ? '' : 'تمارين القواعد في كل درس' },
+    { en:'Vocabulary & Spelling', pct:st.vocPct, cls:'', subEn:(st.vocN ? nAns(st.vocN) + ' · ' : '') + st.irrMastered + '/60 irregular verbs steady', subAr:'ثبت ' + st.irrMastered + ' من ٦٠ فعلًا شاذًا' }
   ];
   openSheet('Progress & Skills Dashboard', 'لوحة التقدم بالساعات والمهارات', [
     h('div', { class:'dash-hero' },
@@ -2190,16 +2089,16 @@ function openDashboard(){
       h('div', { class:'dash-bar' }, h('span', { style:'width:' + Math.max(st.totalMins ? 4 : 0, st.hoursPct) + '%' })),
       h('p', { class:'sm', style:'color:var(--on-dark-2);display:flex;flex-direction:column;gap:2px' }, h('span', { dir:'ltr', style:'unicode-bidi:isolate' }, 'Stage A2 target ≈ 90 hrs: 4–5 months at 5 hrs/week, per the plan.'), h('span', {}, 'هدف مرحلة A2 نحو ٩٠ ساعة: ٤–٥ أشهر بخمس ساعات أسبوعيًا كما في الخطة.')),
       h('div', { class:'dash-meta' },
-        h('div', { class:'dash-m' }, h('b', {}, st.stageMins + 'm'), h('span', {}, 'Lessons · الدروس')),
-        h('div', { class:'dash-m' }, h('b', {}, (G.expressSessions || 0) + ' (' + st.expMins + 'm)'), h('span', {}, 'Express · المختصر')),
-        h('div', { class:'dash-m' }, h('b', {}, st.practiceMins + 'm'), h('span', {}, 'Practice · التدريب')),
-        h('div', { class:'dash-m' }, h('b', {}, st.camblyMins + 'm'), h('span', {}, 'Cambly · المحادثة')))),
+        h('div', { class:'dash-m' }, h('b', {}, st.stageMins + 'm'), h('span', {}, 'Lessons')),
+        h('div', { class:'dash-m' }, h('b', {}, (G.expressSessions || 0) + ' (' + st.expMins + 'm)'), h('span', {}, 'Express')),
+        h('div', { class:'dash-m' }, h('b', {}, st.practiceMins + 'm'), h('span', {}, 'Practice')),
+        h('div', { class:'dash-m' }, h('b', {}, st.camblyMins + 'm'), h('span', {}, 'Cambly')))),
     h('h3', { class:'bi-h', style:'font-size:15.5px' }, h('span', { class:'en', dir:'ltr' }, '4 Skills & Foundation Indicators'), h('small', {}, 'مؤشرات المهارات الأربع والأساس اللغوي')),
     h('div', { class:'skill-list' }, skills.map(function(sk){
       return h('div', { class:'skill-card' },
         h('div', { class:'skill-top' },
           h('b', { style:'font-size:14px' }, sk.en),
-          h('span', { class:'skill-pct' }, sk.pct == null ? 'No data yet · لا بيانات بعد' : sk.pct + '%')),
+          h('span', { class:'skill-pct' }, sk.pct == null ? 'No data yet' : sk.pct + '%')),
         h('div', { class:'skill-track' }, h('span', { class:sk.cls, style:'width:' + (sk.pct == null ? 0 : Math.max(sk.pct ? 6 : 0, sk.pct)) + '%' })),
         sk.subAr ? biNode(sk.subEn, sk.subAr) : h('span', { class:'muted sm', dir:'ltr' }, sk.subEn));
     })),
@@ -2220,7 +2119,7 @@ function unitArg(k, prefix, dflt){ var n = parseInt(String(k).slice(prefix.lengt
 function unitLessonsDone(u){ var list = (D['unit' + u + 'Lessons'] || []).filter(function(l){ return l && !l.test; });
   return list.length > 0 && list.every(function(l){ return !!(l.open && l.id && typeof LESSONS !== 'undefined' && LESSONS[l.id] && isLessonDone(l.id)); }); }
 function unitNameEn(u){ return u === 0 ? 'Foundation Week' : 'Unit ' + u; }
-function unitLockText(u){ return u === 0 ? 'Opens after Foundation Week · يُفتح بعد إكمال الأسبوع التأسيسي' : 'Opens after ' + unitNameEn(u) + ' · يُفتح بعد إكمال الوحدة ' + u; }
+function unitLockText(u){ return u === 0 ? 'Opens after Foundation Week' : 'Opens after ' + unitNameEn(u) + ' · يُفتح بعد إكمال الوحدة ' + u; }
 function arQs(n){ return arDigits(n) + (n >= 3 && n <= 10 ? ' أسئلة' : ' سؤالًا'); }
 function utNums(ut){ var N = ut.questions.length, m = ut.masteryPct || 90, p = ut.passPct || 80;
   return { N:N, m:m, p:p, mN:Math.ceil(N * m / 100), pN:Math.ceil(N * p / 100) }; }
@@ -2237,15 +2136,15 @@ function stUnitLegal(st, ctl){
       h('p', {}, newAr + ' لم تظهر في الدروس' + (ut.appliedTask ? ' + مهمة تطبيقية قصيرة' : '') + '. هدف الإتقان ' + arDigits(n.m) + '٪ (' + arDigits(n.mN) + '/' + arDigits(n.N) + ')، وحد العبور ' + arDigits(n.p) + '٪ (' + arDigits(n.pN) + '/' + arDigits(n.N) + '): من ' + arDigits(n.p) + ' إلى ' + arDigits(n.m - 1) + '٪ تعبر الوحدة وتعود أخطاؤك لمختبر الأخطاء مع اختبار مصغر الأسبوع التالي، وأقل من ' + arDigits(n.p) + '٪ تراجع الدروس الضعيفة أولًا.'),
       h('div', { class:'qi-stats' },
         h('div', { class:'qs' }, h('b', {}, String(n.N)), h('span', {}, 'New Qs · ' + (n.N >= 3 && n.N <= 10 ? 'أسئلة جديدة' : 'سؤالًا جديدًا'))),
-        h('div', { class:'qs' }, h('b', { dir:'ltr' }, n.m + '%'), h('span', {}, 'Mastery · إتقان')),
-        h('div', { class:'qs' }, h('b', { dir:'ltr' }, n.p + '%'), h('span', {}, 'Pass · حد العبور')))),
+        h('div', { class:'qs' }, h('b', { dir:'ltr' }, n.m + '%'), h('span', {}, 'Mastery')),
+        h('div', { class:'qs' }, h('b', { dir:'ltr' }, n.p + '%'), h('span', {}, 'Pass')))),
     lc ? h('div', { class:'sec-h' }, h('h2', { class:'bi-h', style:'font-size:17px' }, h('span', { class:'en', dir:'ltr' }, lc.titleEn), h('small', {}, lc.titleAr))) : null,
     lc ? h('p', { class:'muted sm' }, biNode(lc.introEn, lc.introAr)) : null,
     lc ? h('div', { class:'wlist' }, (lc.terms || []).map(function(t){
       return h('div', { class:'elab-card' },
         h('div', { style:'display:flex;justify-content:space-between;align-items:center;gap:8px' },
           biNode(t.en, t.ar),
-          h('div', { class:'audio-row', style:'margin:0' }, oxBtn(t.en), sayBtn(t.en, 'Pronunciation · نطق ' + t.en))),
+          h('div', { class:'audio-row', style:'margin:0' }, oxBtn(t.en), sayBtn(t.en, 'Pronunciation: ' + t.en))),
         h('p', { class:'w-ex' }, t.ex),
         h('p', { class:'sm muted' }, t.exAr));
     })) : null
@@ -2281,7 +2180,7 @@ function stUnitApplied(st, ctl){
   var cnt = h('p', { class:'wcount' });
   function up(){
     var a = analyze(ta.value);
-    cnt.textContent = 'Separate sentences · الجمل المنفصلة: ' + a.sentences + ' / ' + minS + ' · Words · الكلمات: ' + a.words;
+    cnt.textContent = 'Separate sentences: ' + a.sentences + ' / ' + minS + ' · Words: ' + a.words;
     return a;
   }
   ta.addEventListener('input', up);
@@ -2289,7 +2188,7 @@ function stUnitApplied(st, ctl){
   ctl.set('النتيجة وتحليل الأخطاء', true, function(){
     var a = up();
     if (a.sentences < minS) {
-      toast('Please write at least ' + minS + ' separate sentences ending with a period (.). · اكتب ' + arDigits(minS) + ' جمل منفصلة على الأقل تنتهي بنقطة.');
+      toast('Write at least ' + minS + ' separate sentences ending with a period (.).');
       return;
     }
     if (!UT_STATE) UT_STATE = { unit:st.unit, ans:{}, applied:'' };
@@ -2395,7 +2294,7 @@ function stUnitMiniResult(st, ctl){
   return h('div', { class:'fin' },
     h('span', { class:'done-ic pop' }, ico('check')),
     h('h1', { class:'bi-h' }, h('span', { class:'en', dir:'ltr' }, allCleared ? 'Mini Follow-Up Quiz Mastered!' : 'Mini Follow-Up Quiz Complete'), h('small', {}, allCleared ? 'أتقنت الاختبار المصغر وارتفعت الوحدة إلى درجة الإتقان!' : 'أنهيت الاختبار المصغر')),
-    h('p', {}, 'Score: ' + okCnt + ' / ' + idxs.length + '. · النتيجة: ' + okCnt + ' من ' + idxs.length + '.'));
+    h('p', {}, 'Score: ' + okCnt + ' / ' + idxs.length + '.'));
 }
 
 /* ---------- Pre-Tests for Units 5, 8, 9, 12 (90% Exemption: the first attempt only) ---------- */
@@ -2464,9 +2363,9 @@ function stPreTestIntro(st, ctl){
          h('p', {}, 'المحاولة الأولى وحدها هي التي تُحسب للإعفاء، ويلزمك ' + arDigits(need) + ' من ' + arDigits(n) + ' فأكثر (٩٠٪). ولا تظهر الإجابات والشروح إلا في النهاية، والخروج في المنتصف يُعدّ محاولتك الأولى وتُحسب الأسئلة التي لم تُجب خاطئة. أما حد العبور العادي للوحدة فيبقى ٨٠٪.')],
     pt.noteAr ? h('p', { class:'pt-note' }, pt.noteAr) : null,
     h('div', { class:'qi-stats' },
-      h('div', { class:'qs' }, h('b', {}, String(n)), h('span', {}, 'Questions · أسئلة')),
-      h('div', { class:'qs' }, h('b', { dir:'ltr' }, typed + '/' + n), h('span', {}, 'Typing · كتابة وتصريف')),
-      h('div', { class:'qs' }, h('b', { dir:'ltr' }, need + '/' + n), h('span', {}, 'To Skip · للإعفاء'))));
+      h('div', { class:'qs' }, h('b', {}, String(n)), h('span', {}, 'Questions')),
+      h('div', { class:'qs' }, h('b', { dir:'ltr' }, typed + '/' + n), h('span', {}, 'Typing')),
+      h('div', { class:'qs' }, h('b', { dir:'ltr' }, need + '/' + n), h('span', {}, 'To Skip'))));
 }
 
 function stPreTestQ(st, ctl){
@@ -2509,12 +2408,12 @@ function ptReviewItem(item, idx, N, a){
       sent = h('p', { class:'q-en sm', dir:'ltr' }, pp[0], h('span', { class:'blank' + mark }, answered ? mine : ' '), pp[1] || '');
     } else {
       sent = h('div', {}, h('p', { class:'q-en sm', dir:'ltr' }, item.s),
-        answered ? h('p', { class:'pt-pick', dir:'ltr' }, h('small', {}, 'Your answer · إجابتك'), h('span', { class:'blank' + mark }, mine)) : null);
+        answered ? h('p', { class:'pt-pick', dir:'ltr' }, h('small', {}, 'Your answer'), h('span', { class:'blank' + mark }, mine)) : null);
     }
   }
   return h('div', { class:'pt-item' },
     qCard(sent, { tag:'Q' + (idx + 1) + '/' + N }),
-    fbCard(ok, item.why, null, ['Correct answer · الإجابة الصحيحة', correct], item.whyEn, answered ? null : 'No answer · لم تُجب'));
+    fbCard(ok, item.why, null, ['Correct answer', correct], item.whyEn, answered ? null : 'No answer'));
 }
 
 function stPreTestResult(st, ctl){
@@ -2596,7 +2495,7 @@ function openCambly(){
   function drawLogs(){
     var logs = (G.camblyLogs || []).slice().reverse();
     if (!logs.length) {
-      put(logsBox, h('p', { class:'muted sm' }, 'No Cambly sessions logged yet. Your 1st session is your Speaking Baseline! · لم تُسجَّل أي جلسة بعد (أول جلسة هي قياس التحدث).'));
+      put(logsBox, h('p', { class:'muted sm' }, 'No Cambly sessions logged yet. Your 1st session is your Speaking Baseline!'));
       return;
     }
     put(logsBox, logs.map(function(l, idx){
@@ -2610,8 +2509,8 @@ function openCambly(){
 
   var copyBtn = h('button', { class:'btn sm', type:'button', on:{ click:function(){
     try {
-      navigator.clipboard.writeText(cardText).then(function(){ toast('Cambly Card copied! Paste it in Cambly chat. · نُسخت بطاقة كامبلي! الصقها لمعلمك في المحادثة.'); }, function(){ toast('Select text above to copy · حدد النص أعلاه لنسخه'); });
-    } catch (e) { toast('Select text above to copy · حدد النص أعلاه لنسخه'); }
+      navigator.clipboard.writeText(cardText).then(function(){ toast('Cambly Card copied! Paste it in Cambly chat.'); }, function(){ toast('Select text above to copy'); });
+    } catch (e) { toast('Select text above to copy'); }
   } } }, ico('copy'), biBtn('Copy Card for Cambly Tutor', 'نسخ البطاقة لمعلم كامبلي'));
 
   var logBtn = h('button', { class:'btn light sm', type:'button', on:{ click:function(){
@@ -2622,7 +2521,7 @@ function openCambly(){
     touch(); SYNC.soon();
     drawLogs();
     render();
-    toast('Cambly session logged (+' + mins + ' min & ' + phr + ' phrases)! · سُجّلت جلسة كامبلي في الساعات ومؤشر التحدث!');
+    toast('Cambly session logged (+' + mins + ' min, ' + phr + ' phrases).');
   } } }, ico('check'), biBtn('Log Cambly Session', 'تسجيل الجلسة في تقدمك'));
 
   openSheet('Weekly Cambly Card & Session Log', 'بطاقة كامبلي الأسبوعية وسجل الجلسات', [
@@ -2634,8 +2533,8 @@ function openCambly(){
     h('div', { class:'cambly-form' },
       biNode('Log Completed Cambly Session', 'سجّل جلستك بعد انتهائها (تُضاف للساعات ومؤشر التحدث)'),
       h('div', { class:'c-grid' },
-        h('div', { class:'c-field' }, h('label', {}, 'Duration (min) · المدة بالدقائق'), inMins),
-        h('div', { class:'c-field' }, h('label', {}, 'Phrases Used · العبارات المستعملة'), inPhrases)),
+        h('div', { class:'c-field' }, h('label', {}, 'Duration (min)'), inMins),
+        h('div', { class:'c-field' }, h('label', {}, 'Phrases Used'), inPhrases)),
       logBtn),
     h('h3', { class:'bi-h', style:'font-size:15px' }, h('span', { class:'en', dir:'ltr' }, 'Logged Cambly Sessions'), h('small', {}, 'سجل جلسات كامبلي السابقة')),
     logsBox
@@ -2648,7 +2547,7 @@ function buildBackupPayload(){
   saveLocal();
   var data = {};
   progressKeys().forEach(function(k){ var v = readJSON(k); if (v) data[k] = v; });
-  return JSON.stringify({ app: 'English Passport · جواز الإنجليزية', version: 6, exportedAt: new Date().toISOString(), keys: data }, null, 2);
+  return JSON.stringify({ app: 'English Passport', version: 6, exportedAt: new Date().toISOString(), keys: data }, null, 2);
 }
 
 function downloadBackupFile(){
@@ -2660,9 +2559,9 @@ function downloadBackupFile(){
     doc.body.appendChild(a);
     a.click();
     setTimeout(function(){ try { doc.body.removeChild(a); URL.revokeObjectURL(url); } catch (e) {} }, 250);
-    toast('Backup file downloaded (.json)! · تم تنزيل ملف النسخة الاحتياطية للجوال!');
+    toast('Backup file downloaded (.json)!');
   } catch (e) {
-    toast('Use Copy Backup Text below · استخدم زر نسخ النص الاحتياطي بالأسفل');
+    toast('Use Copy Backup Text below');
   }
 }
 
@@ -2676,10 +2575,10 @@ function restoreBackupPayload(rawJson){
     touch(); updateProgress(); SYNC.soon();
     closeSheet();
     render();
-    toast('Backup restored successfully! · استُعيدت النسخة الاحتياطية بنجاح!');
+    toast('Backup restored successfully!');
     return true;
   } catch (e) {
-    toast('Invalid backup file or JSON text. · ملف أو نص النسخة الاحتياطية غير صالح.');
+    toast('Invalid backup file or JSON text.');
     return false;
   }
 }
@@ -2696,18 +2595,18 @@ function backupWidgetNode(){
   });
   return h('div', { class:'bkp-box' },
     biNode('Device Backup & Restore (Stage 5)', 'النسخة الاحتياطية في الجوال (تنزيل واستعادة)'),
-    h('p', { class:'muted sm' }, 'Save a backup copy of your progress, Error Lab, Irregular Verbs schedule, and Cambly logs to your iPhone Files, or restore anytime. · احفظ نسخة احتياطية من تقدمك ومختبر الأخطاء وسجل كامبلي في ملفات الآيفون أو استعدها في أي وقت.'),
+    h('p', { class:'muted sm' }, 'Save a backup copy of your progress, Error Lab, Irregular Verbs schedule, and Cambly logs to your iPhone Files, or restore anytime.'),
     h('div', { class:'wbtns' },
       h('button', { class:'btn sm', type:'button', on:{ click:downloadBackupFile } }, ico('mark'), biBtn('Download Backup (.json)', 'تنزيل نسخة احتياطية للجوال')),
       h('button', { class:'btn out sm', type:'button', on:{ click:function(){
         var j = buildBackupPayload();
         ta.value = j;
-        try { navigator.clipboard.writeText(j); toast('Backup JSON copied! · نُسخ كود النسخة الاحتياطية!'); } catch (e) { toast('Backup shown in box below · ظهر الكود في المربع بالأسفل'); }
+        try { navigator.clipboard.writeText(j); toast('Backup JSON copied!'); } catch (e) { toast('Backup shown in box below'); }
       } } }, ico('copy'), biBtn('Copy Backup Code', 'نسخ كود النسخة'))),
     ta,
     h('div', { class:'wbtns' },
       h('button', { class:'btn out sm', type:'button', on:{ click:function(){ fileIn.click(); } } }, biBtn('Restore from .json File', 'استعادة من ملف .json')),
-      h('button', { class:'btn out sm', type:'button', on:{ click:function(){ if (!ta.value.trim()) { toast('Paste backup JSON in the box first · الصق كود النسخة الاحتياطية في المربع أولًا'); return; } restoreBackupPayload(ta.value); } } }, biBtn('Restore Pasted Code', 'استعادة النص الملصوق'))),
+      h('button', { class:'btn out sm', type:'button', on:{ click:function(){ if (!ta.value.trim()) { toast('Paste backup JSON in the box first'); return; } restoreBackupPayload(ta.value); } } }, biBtn('Restore Pasted Code', 'استعادة النص الملصوق'))),
     fileIn);
 }
 
@@ -2728,10 +2627,10 @@ function openPlan(){
     h('ul', { class:'anat' }, D.anatomy.map(function(a){ return h('li', {}, h('span', { class:'an-m', 'aria-label':a.m + ' دقائق' }, String(a.m)), h('span', { class:'an-t', html:'<b>' + esc((a.nEn ? a.nEn + ' · ' : '') + a.n) + ':</b> ' + arHTML(a.soon ? a.d + ' (في الكورس الكامل)' : a.d) })); })),
     h('h3', { class:'bi-h', style:'font-size:15.5px' }, h('span', { class:'en', dir:'ltr' }, 'How Progress Works'), h('small', {}, 'كيف يُحسب تقدمك')),
     h('ul', { class:'rules' }, [
-      'Every stage you complete is stamped on the lesson page. · كل مرحلة تكملها من المراحل الست يُختم عليها في صفحة الدرس.',
-      'Lesson quizzes require 80% to pass, followed by an error analysis by category. · اختبار الدرس يحتاج 80% للنجاح، ويليه تحليل لأخطاء الدرس وأسبابها.',
-      'Every missed question enters the mistake notebook and comes back after 1 day, 3 days, a week and a month. · كل سؤال خاطئ يدخل دفتر الأخطاء، ويعود بعد يوم، ثم ٣ أيام، ثم أسبوع، ثم شهر.',
-      'Writing requires at least 4 separate sentences and separates spelling from grammar feedback. · الكتابة تشترط 4 جمل منفصلة على الأقل، وتصحيحها يفصل الإملاء عن القواعد.'
+      'Every stage you complete is stamped on the lesson page.',
+      'Lesson quizzes require 80% to pass, followed by an error analysis by category.',
+      'Every missed question enters the mistake notebook and comes back after 1 day, 3 days, a week and a month.',
+      'Writing requires at least 4 separate sentences and separates spelling from grammar feedback.'
     ].map(function(t){ return h('li', {}, t); }))
   ]);
 }
@@ -2752,11 +2651,11 @@ var AI_OFF = ['not_granted', 'sampling_disabled', 'not_declared', 'capability_di
 function initAI(){ if (!(window.claude && typeof window.claude.use === 'function')) return;
   window.claude.use('sample').then(function(s){ var had = !!SAMPLE; SAMPLE = typeof s === 'function' ? s : null; if (!!SAMPLE !== had && (G.ui.view === 'player' || G.ui.view === 'lesson')) render(); }, function(){ SAMPLE = null; }); }
 function aiErr(code){
-  if (code === 'rate_limited') return 'Usage limit reached temporarily. Try again shortly. · وصلنا لحد الاستخدام مؤقتًا. المحاولة بعد قليل تنفع.';
-  if (code === 'session_expired') return 'Session expired. Please sign in again. · انتهت الجلسة. تسجيل الدخول من جديد يحل المشكلة.';
-  if (code === 'refused') return 'Could not answer this request. Try rephrasing. · تعذّرت الإجابة عن هذا الطلب. صياغة ثانية قد تنفع.';
-  if (code === 'prompt_too_large') return 'Text is too long. A shorter paragraph works best. · النص طويل جدًا. فقرة أقصر تكفي.';
-  return 'Teacher is unavailable right now. Try again in a moment. · تعذّر الوصول للمعلم الحين. حاول بعد لحظات.'; }
+  if (code === 'rate_limited') return 'Usage limit reached temporarily. Try again shortly.';
+  if (code === 'session_expired') return 'Session expired. Please sign in again.';
+  if (code === 'refused') return 'Could not answer this request. Try rephrasing.';
+  if (code === 'prompt_too_large') return 'Text is too long. A shorter paragraph works best.';
+  return 'Teacher is unavailable right now. Try again in a moment.'; }
 function thinking(t){ return h('div', { class:'thinking' }, h('span', { class:'dots', 'aria-hidden':'true' }, h('i'), h('i'), h('i')), h('span', {}, t)); }
 function WPROMPT(text){ return 'أنت معلم لغة إنجليزية خبير، تصحح فقرة كتبها متعلم عربي مستواه بداية A2.\n' +
   'الدرس: ' + (D.en || 'Hello from Antarctica') + ' — ' + (D.ar || 'المضارع البسيط والمضارع المستمر') + '.\n' +
@@ -2771,14 +2670,14 @@ function WPROMPT(text){ return 'أنت معلم لغة إنجليزية خبير
   'الفقرة:\n---\n' + text + '\n---'; }
 function correctWriting(ta, btn, box){
   var text = ta.value.trim(), a = analyze(text);
-  if (a.words < 12) { toast('Paragraph is too short to check. · الفقرة قصيرة جدًا للتصحيح.'); return; }
+  if (a.words < 12) { toast('Paragraph is too short to check.'); return; }
   if (!SAMPLE) {
     var localFb = localWritingCheck(text);
     S.writing.fb = localFb; S.writing.text = ta.value; touch();
     box.hidden = false; paintFeedback(box, localFb);
     return;
   }
-  btn.disabled = true; box.hidden = false; put(box, thinking('Teacher is reading your paragraph… · المعلم يقرأ فقرتك…'));
+  btn.disabled = true; box.hidden = false; put(box, thinking('Teacher is reading your paragraph…'));
   try { box.scrollIntoView({ block:'nearest', behavior:RM ? 'auto' : 'smooth' }); } catch (e) {}
   SAMPLE.json(WPROMPT(text), { modelTier:'default' }).then(function(r){
     if (!r || typeof r !== 'object' || Array.isArray(r)) throw { code:'invalid_json' };
@@ -2821,14 +2720,14 @@ function mdLite(text){ var html = '', list = null;
   close(); html += '<p dir="auto">' + inlineMD(t) + '</p>'; });
   close(); return html; }
 function openAsk(){ if (!SAMPLE) return;
-  var log = h('div', { class:'ask-log', 'aria-live':'polite' }), chips = h('div', { class:'ask-chips' }), input = h('textarea', { id:'askInput', rows:'2', placeholder:'Ask your question here… · سؤالك هنا…', 'aria-label':'Question · السؤال' });
+  var log = h('div', { class:'ask-log', 'aria-live':'polite' }), chips = h('div', { class:'ask-chips' }), input = h('textarea', { id:'askInput', rows:'2', placeholder:'Ask your question here…', 'aria-label':'Question · السؤال' });
   var send = h('button', { class:'btn', type:'submit' }, biBtn('Send', 'إرسال')), stop = h('button', { class:'btn out', type:'button', hidden:true }, biBtn('Stop', 'إيقاف'));
   var form = h('form', { class:'ask-form' }, input, h('div', { class:'row' }, send, stop));
   askTurns.forEach(function(t){ log.append(t.role === 'user' ? h('div', { class:'bub me', dir:'auto' }, t.content) : h('div', { class:'bub ai', html:mdLite(t.content) })); });
   if (!askTurns.length) put(chips, askChipsNow().map(function(c){ return h('button', { class:'ask-chip', type:'button', on:{ click:function(){ ask(c); } } }, c); }));
   function ask(q){ if (!SAMPLE || askBusy || !q.trim()) return;
     askBusy = true; input.value = ''; send.disabled = true; stop.hidden = false; put(chips);
-    log.append(h('div', { class:'bub me', dir:'auto' }, q)); var bub = h('div', { class:'bub ai' }, thinking('Teacher is thinking… · المعلم يفكر…')); log.append(bub);
+    log.append(h('div', { class:'bub me', dir:'auto' }, q)); var bub = h('div', { class:'bub ai' }, thinking('Teacher is thinking…')); log.append(bub);
     try { bub.scrollIntoView({ block:'nearest' }); } catch (e) {}
     askTurns.push({ role:'user', content:q });
     var inputTurns = [{ role:'user', content:RULES() }].concat(askTurns.slice(-7));
@@ -2837,7 +2736,7 @@ function openAsk(){ if (!SAMPLE) return;
     .catch(function(e){ var code = e && e.code; askTurns.pop();
       if (e && e.text) bub.innerHTML = mdLite(e.text); else put(bub);
       if (code === 'cancelled') { if (!(e && e.text)) bub.remove(); return; }
-      if (AI_OFF.indexOf(code) >= 0) { SAMPLE = null; closeSheet(); toast('Teacher is unavailable right now. · المعلم غير متاح هنا الحين.'); return; }
+      if (AI_OFF.indexOf(code) >= 0) { SAMPLE = null; closeSheet(); toast('Teacher is unavailable right now.'); return; }
       bub.append(h('p', { class:'err' }, aiErr(code))); })
     .then(function(){ askBusy = false; askCtl = null; send.disabled = false; stop.hidden = true; }); }
   form.addEventListener('submit', function(e){ e.preventDefault(); ask(input.value); });
@@ -2846,7 +2745,7 @@ function openAsk(){ if (!SAMPLE) return;
   openSheet('Ask the Teacher', 'اسأل المعلم', [
     h('p', { class:'muted sm' }, biNode('Ask about the grammar rule, any word, or any sentence in this lesson.', 'سؤال عن القاعدة أو أي كلمة أو جملة في الدرس. الإجابة بالعربي مع أمثلة قصيرة.')),
     log, chips, form,
-    h('p', { class:'fine' }, 'Each question uses your Claude allowance. · كل سؤال يُحسب من استخدامك في Claude.')
+    h('p', { class:'fine' }, 'Each question uses your Claude allowance.')
   ], function(){ if (askCtl) askCtl.abort(); });
   setTimeout(function(){ try { input.focus({ preventScroll:true }); } catch (e) {} }, 60);
 }
@@ -3040,7 +2939,7 @@ function createSync(){
       var nodes = [
         h('div', { class:'sync-h' },
           biNode('Cloud Sync (GitHub)', 'المزامنة السحابية (GitHub)'),
-          h('span', { class:'sync-st ' + (!c ? 'off' : problem ? 'bad' : 'on') }, !c ? 'Off · متوقفة' : problem ? 'Problem · مشكلة' : 'On · مفعّلة')),
+          h('span', { class:'sync-st ' + (!c ? 'off' : problem ? 'bad' : 'on') }, !c ? 'Off' : problem ? 'Problem' : 'On')),
         h('p', { class:'sync-line' }, line)
       ];
       if (!c) {
@@ -3048,16 +2947,16 @@ function createSync(){
         var own = h('input', { class:'sync-in', type:'text', dir:'ltr', value:d.owner, autocapitalize:'none', spellcheck:'false', 'aria-label':'Account · الحساب' });
         var rep = h('input', { class:'sync-in', type:'text', dir:'ltr', value:d.repo, autocapitalize:'none', spellcheck:'false', 'aria-label':'Repository · المستودع' });
         nodes.push(
-          h('label', { class:'sync-lbl', for:'syncToken' }, 'GitHub key · مفتاح GitHub'), tok,
-          h('details', { class:'sync-adv' }, h('summary', {}, 'Repository · المستودع: ' + d.owner + '/' + d.repo), h('div', { class:'sync-grid' }, own, rep)),
+          h('label', { class:'sync-lbl', for:'syncToken' }, 'GitHub key'), tok,
+          h('details', { class:'sync-adv' }, h('summary', {}, 'Repository: ' + d.owner + '/' + d.repo), h('div', { class:'sync-grid' }, own, rep)),
           h('button', { class:'btn sm', type:'button', id:'syncConnect', on:{ click:function(){
             var t = tok.value.trim();
-            if (!t) { toast('Paste the key first · الصق المفتاح أولًا'); return; }
+            if (!t) { toast('Paste the key first'); return; }
             writeJSON(KEY_SYNC, { token:t, owner:own.value.trim() || d.owner, repo:rep.value.trim() || d.repo });
             setMeta({ files:{} }); branchOK = false; saveLocal(); draw();
             pull().then(function(){ return push(false); }).then(function(){
               var mm = meta(); draw();
-              toast(mm.err && MSG[mm.err] ? MSG[mm.err][1] : 'Connected · تم الربط، وتقدمك يُحفظ في السحابة');
+              toast(mm.err && MSG[mm.err] ? MSG[mm.err][1] : 'Connected');
             });
           } } }, ico('check'), biBtn('Connect', 'ربط')),
           h('p', { class:'muted sm' }, biNode('The key stays on this device and is never uploaded.', 'المفتاح يبقى في هذا الجهاز ولا يُرفع إلى GitHub.')));
@@ -3095,7 +2994,7 @@ function bindGlobal(){
   $('#dSay').innerHTML = '<span class="ico">' + IC.speaker + '</span>';
 }
 function boot(){
-  doc.documentElement.setAttribute('lang', 'ar'); doc.documentElement.setAttribute('dir', 'rtl');
+  doc.documentElement.setAttribute('lang', 'en'); doc.documentElement.setAttribute('dir', 'ltr');
   var hv = (location.hash || '').slice(1); if (['home','lessons','words','review','lesson'].indexOf(hv) >= 0 && G.ui.welcomed) G.ui.view = hv;
   bindGlobal(); updateProgress(); render(); initAI(); SYNC.init();
 }
