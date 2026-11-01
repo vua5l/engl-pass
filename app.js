@@ -1415,7 +1415,7 @@ function stPredict(ctl){ var p = D.reading.predict, sel = S.predict;
   if (sel == null) ctl.set('القراءة الأولى', false, nextStep); else ctl.enable('القراءة الأولى');
   var btns = p.opts.map(function(t, i){
     var enOpt = p.optsEn && p.optsEn[i];
-    var b = h('button', { class:'opt ar' + (sel === i ? ' picked' : ''), type:'button' },
+    var b = h('button', { class:'opt' + (enOpt ? '' : ' ar') + (sel === i ? ' picked' : ''), type:'button' },
       enOpt ? biNode(enOpt, t) : h('span', {}, t),
       h('span', { class:'o-dot' }));
     b.addEventListener('click', function(){ S.predict = i; S.revealed = false; touch(); btns.forEach(function(x, j){ x.classList.toggle('picked', j === i); }); ctl.enable('القراءة الأولى'); }); return b; });
@@ -1512,7 +1512,7 @@ function stListen1(ctl){
     if (sel != null) put(fb, fbCard(sel === p.a, p.reveal || p.why, null, null, p.revealEn || p.whyEn));
     var btns = p.opts.map(function(t, i){
       var enOpt = p.optsEn && p.optsEn[i];
-      var b = h('button', { class:'opt ar' + (sel === i ? ' picked' : ''), type:'button' },
+      var b = h('button', { class:'opt' + (enOpt ? '' : ' ar') + (sel === i ? ' picked' : ''), type:'button' },
         enOpt ? biNode(enOpt, t) : h('span', {}, t),
         h('span', { class:'o-dot' }));
       b.addEventListener('click', function(){
@@ -2087,7 +2087,7 @@ function openDashboard(){
         biNode('Stage A2 Study Hours', 'ساعات الدراسة في مرحلة A2'),
         h('b', {}, st.hoursStr + ' / ' + st.a2TargetHrs + ' hrs')),
       h('div', { class:'dash-bar' }, h('span', { style:'width:' + Math.max(st.totalMins ? 4 : 0, st.hoursPct) + '%' })),
-      h('p', { class:'sm', style:'color:var(--on-dark-2);display:flex;flex-direction:column;gap:2px' }, h('span', { dir:'ltr', style:'unicode-bidi:isolate' }, 'Stage A2 target ≈ 90 hrs: 4–5 months at 5 hrs/week, per the plan.'), h('span', {}, 'هدف مرحلة A2 نحو ٩٠ ساعة: ٤–٥ أشهر بخمس ساعات أسبوعيًا كما في الخطة.')),
+      h('p', { class:'sm', style:'color:var(--on-dark-2);display:flex;flex-direction:column;gap:2px' }, h('span', { dir:'ltr', style:'unicode-bidi:isolate' }, 'Stage A2 target ≈ 90 hrs: 4–5 months at 5 hrs/week, per the plan.')),
       h('div', { class:'dash-meta' },
         h('div', { class:'dash-m' }, h('b', {}, st.stageMins + 'm'), h('span', {}, 'Lessons')),
         h('div', { class:'dash-m' }, h('b', {}, (G.expressSessions || 0) + ' (' + st.expMins + 'm)'), h('span', {}, 'Express')),
