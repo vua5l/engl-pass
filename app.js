@@ -572,7 +572,7 @@ function todayLesson(){
   var head = h('div', { class:'td-head' },
     h('div', { class:'td-txt' },
       h('p', { class:'td-lbl' }, (u === 0 ? 'Foundation Week' : 'Unit ' + u) + (me.n ? ' · Lesson ' + me.n : '')),
-      h('h1', { class:'td-title' }, D.en || me.en || ''),
+      h('h1', { class:'td-title' }, me.en || D.en || ''),
       h('p', { class:'td-sub' }, String(D.subEn || me.subEn || '').replace(/^Foundation \d+ · /, '') + (pr.mins ? ' · ' + pr.mins + ' min' + (pr.done ? ' left' : '') : ''))),
     penguin(54, 77, 'td-peng'));
   var doneCard = done ? h('div', { class:'tp-donecard' },
@@ -2382,7 +2382,7 @@ function stPreTestQ(st, ctl){
   if (item.type === 'typing') {
     /* التعليمة (والملاحظة إن وُجدت في الاختبار) بالإنجليزية ثم العربية تحتها، لا في سطر واحد يتداخل فيه الاتجاهان على الجوال الضيق. */
     head.push(h('div', { class:'pt-ins' },
-      h('div', { class:'pt-ins-t' }, biNode('Type the missing words. Use the words in brackets.', 'اكتب الكلمات الناقصة مستعينًا بما بين القوسين.')),
+      h('div', { class:'pt-ins-t' }, instr('Type the missing words. Use the words in brackets.', 'اكتب الكلمات الناقصة مستعينًا بما بين القوسين.')),
       (pt.noteEn || pt.noteAr) ? h('div', { class:'pt-ins-n' }, biNode(pt.noteEn || '', pt.noteAr || '')) : null));
     nodes = Typing(item, o, ctl);
   } else {
@@ -2956,7 +2956,7 @@ function createSync(){
             setMeta({ files:{} }); branchOK = false; saveLocal(); draw();
             pull().then(function(){ return push(false); }).then(function(){
               var mm = meta(); draw();
-              toast(mm.err && MSG[mm.err] ? MSG[mm.err][1] : 'Connected');
+              toast(mm.err && MSG[mm.err] ? MSG[mm.err][0] : 'Connected');
             });
           } } }, ico('check'), biBtn('Connect', 'ربط')),
           h('p', { class:'muted sm' }, biNode('The key stays on this device and is never uploaded.', 'المفتاح يبقى في هذا الجهاز ولا يُرفع إلى GitHub.')));

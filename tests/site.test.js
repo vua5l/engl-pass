@@ -128,26 +128,31 @@ function fakeGitHub(token) {
   const text = page => page.innerText('#screen');
   const cta = async page => { const b = page.locator('.pl-foot .btn:visible').last(); await b.click(); await sleep(120); };
   async function startApp(page) { await page.goto(URL0); await sleep(400); if (await page.locator('.wel-cta .btn').count()) { await page.click('.wel-cta .btn'); await sleep(250); } }
-  async function openFoundation(page, i) { await page.locator('.u0-row').nth(i).click(); await sleep(250); }
-  // كتلة وحدة مفتوحة في شاشة «الدروس» برقمها، فلا تختلط سطور الوحدة 1 بسطور وحدة أخرى مفتوحة
-  const unitBlock = (page, u) => page.locator('.unit-open').filter({ has: page.locator('.uo-head .u-n', { hasText: new RegExp('^' + u + '$') }) });
-  // درس مفتوح بمعرّفه من سطره في قائمة وحدته: الأسبوع التأسيسي في الشاشة الحالية، وغيره في كتلة وحدته في شاشة «الدروس»
-  // (الرئيسية تعرض أول ثلاثة دروس من وحدة واحدة فقط). ويرجع false إن لم يجد السطر أو فتح السطر درسًا آخر.
+  // تصميم 1 نوفمبر 2026: الدروس في شاشة «Course»، والوحدة المفتوحة بطاقة واحدة (.tl-it.open) تُفتح بلمس سطرها.
+  // كتلة وحدة مفتوحة برقمها، فلا تختلط سطور الوحدة 1 بسطور وحدة أخرى
+  const unitBlock = (page, u) => page.locator('.tl-it.open').filter({ has: page.locator('.u-n', { hasText: new RegExp('^' + u + '$') }) });
+  async function expandUnit(page, u) {
+    await page.locator('.nav-it').nth(1).click(); await sleep(200);
+    if (await unitBlock(page, u).count()) return;
+    const row = page.locator('.tl-it').filter({ has: page.locator('.u-n', { hasText: new RegExp('^' + u + '$') }) }).locator('button.tl-row');
+    if (await row.count()) { await row.first().click(); await sleep(200); }
+  }
+  // درس الأسبوع التأسيسي بترتيبه: يفتح «Today» على ذلك الدرس
+  async function openFoundation(page, i) { await expandUnit(page, 0); await unitBlock(page, 0).locator('.cl-list > li').nth(i).locator('button.cl-row').click(); await sleep(250); }
+  // درس مفتوح بمعرّفه من سطره في بطاقة وحدته في «Course». ويرجع false إن لم يجد السطر أو فتح السطر درسًا آخر.
   async function openLesson(page, lid) {
     const l = COURSE.find(x => x.id === lid);
-    if (l.unit === 0) await openFoundation(page, l.row);
-    else {
-      await page.locator('.nav-it').nth(1).click(); await sleep(200);
-      const row = unitBlock(page, l.unit).locator('.uo-list > li').nth(l.row).locator('button.uo-row');
-      if (!(await row.count())) return false;
-      await row.click(); await sleep(250);
-    }
+    await expandUnit(page, l.unit);
+    const row = unitBlock(page, l.unit).locator('.cl-list > li').nth(l.row).locator('button.cl-row');
+    if (!(await row.count())) return false;
+    await row.click(); await sleep(250);
     return ((await getJSON(page, 'ep4.course')) || {}).cur === lid;
   }
-  async function backHome(page) { const b = page.locator('[aria-label="Back · رجوع"]'); if (await b.count()) { await b.click(); await sleep(200); } }
+  // لا صفحة درس منفصلة بعد اليوم: «Today» هي الرئيسية وصفحة الدرس معًا
+  async function backHome(page) { const n = page.locator('.nav-it'); if (await n.count()) { await n.nth(0).click(); await sleep(200); } }
   async function doRecallStage(page, answerFn) {
-    await page.locator('.ld .btn').filter({ hasText: /Start Lesson|Continue/ }).first().click(); await sleep(250);
-    await cta(page); // المقدمة
+    await page.locator('.tp-card .btn').filter({ hasText: /Start|Continue/ }).first().click(); await sleep(250);
+    // لا شاشة تقديم منذ 1 نوفمبر 2026: يبدأ الدرس من أول سؤال
     for (let i = 0; i < 12; i++) {
       const inp = page.locator('.gap-in:enabled');
       if (await inp.count()) { await inp.fill(answerFn(i)); await inp.press('Enter'); await sleep(150); await cta(page); }
@@ -162,7 +167,7 @@ function fakeGitHub(token) {
     ok(await page.locator('.wel').count() === 1, 'first visit shows the welcome screen');
     await page.click('.wel-cta .btn'); await sleep(250);
     ok(!(await page.locator('#gh-fab').count()) && !(await page.locator('body').innerText()).includes('مزامنة GitHub'), 'no floating sync button anywhere');
-    await page.click('[aria-label="Open Lesson · افتح درس اليوم"]'); await sleep(250);
+    await page.locator('.nav-it').nth(0).click(); await sleep(250);
     ok((await text(page)).includes('First Week at the Law Office'), "today's lesson on a fresh start is Foundation lesson 1 (u0l1)");
     const g0 = await getJSON(page, 'ep4.course');
     ok(g0 && g0.ui.welcomed === true && g0.startedAt > 0 && g0.cur === 'u0l1', 'course state saved with welcome flag, start date and current lesson');
@@ -184,20 +189,20 @@ function fakeGitHub(token) {
     const g2 = await getJSON(page, 'ep4.course');
     ok(Object.keys(g2.mistakes).length === 5 && g2.cur === 'u0l3', 'mistakes stay after switching lessons, current lesson updated');
     await backHome(page);
-    await page.locator('.nav-it').nth(3).click(); await sleep(250);
+    await page.locator('.nav-it').nth(2).click(); await sleep(250);
     let t = await text(page);
-    ok(t.includes('Mistake Notebook · All Lessons') && t.includes('F1 ·') && t.includes('Nothing due today'), 'review tab lists lesson-1 mistakes while lesson 3 is current, nothing due today');
+    ok(t.includes('Mistake notebook') && t.includes('F1 ·') && t.includes('Nothing due today'), 'review tab lists lesson-1 mistakes while lesson 3 is current, nothing due today');
 
     // نقدّم الزمن: نجعل الأخطاء مستحقة ثم نراجع
     await page.evaluate(() => { const g = JSON.parse(localStorage.getItem('ep4.course')); Object.keys(g.mistakes).forEach(k => { g.mistakes[k].due = Date.now() - 1000; }); localStorage.setItem('ep4.course', JSON.stringify(g)); });
     await page.reload(); await sleep(400);
-    await page.locator('.nav-it').nth(3).click(); await sleep(250);
+    await page.locator('.nav-it').nth(2).click(); await sleep(250);
     t = await text(page);
-    ok(/5\s*\n?\s*Due today/.test(t), 'after the due date passes, 5 items are due today');
+    ok(/5\s*\n?\s*Questions due today/.test(t), 'after the due date passes, 5 items are due today');
     const ans0 = await page.evaluate(() => LESSONS.u0l1.recall[0].ans[0]);
     await page.locator('#nbHero .btn').click(); await sleep(250);
     t = await text(page);
-    ok(t.includes('Review · مراجعة · F1'), 'review session renders a lesson-1 question while lesson 3 is current');
+    ok(t.includes('Review · F1'), 'review session renders a lesson-1 question while lesson 3 is current');
     await page.locator('.gap-in:enabled').fill(ans0); await page.locator('.gap-in').press('Enter'); await sleep(150);
     const g3 = await getJSON(page, 'ep4.course');
     const m0 = g3.mistakes['u0l1|rc-0'];
@@ -206,10 +211,10 @@ function fakeGitHub(token) {
 
     // اللوحة
     await page.locator('.nav-it').nth(0).click(); await sleep(200);
-    await page.locator('.qtile').first().click(); await sleep(250);
+    await page.locator('.jr-more').first().click(); await sleep(250);
     const dash = await page.innerText('#sheetBox');
     ok(dash.includes('Progress & Skills Dashboard') && dash.includes('No data yet') && dash.includes('/ 90 hrs'), 'dashboard shows real data only ("No data yet" where nothing was answered) and a 90-hour A2 target');
-    ok(/Vocabulary & Spelling · المفردات والإملاء\s*\n?\s*0%/.test(dash), 'vocabulary indicator comes from real answers (0% after five wrong recalls)');
+    ok(/Vocabulary & Spelling\s*\n?\s*0%/.test(dash), 'vocabulary indicator comes from real answers (0% after five wrong recalls)');
     await page.click('#sheetBox .close'); await sleep(150);
 
     // الاستماع لم يعد يتسرب إليه درس آخر
@@ -221,7 +226,7 @@ function fakeGitHub(token) {
     // الإعدادات والنسخة الاحتياطية
     await page.click('#gearBtn'); await sleep(250);
     const sheet = await page.innerText('#sheetBox');
-    ok(sheet.includes('Settings & Plan') && sheet.includes('المزامنة غير مفعّلة') && (await page.locator('#syncToken').count()) === 1, 'gear opens Settings with the sync section (off) and a key field');
+    ok(sheet.includes('Settings & Plan') && sheet.includes('Cloud sync is off') && (await page.locator('#syncToken').count()) === 1, 'gear opens Settings with the sync section (off) and a key field');
     await page.locator('.bkp-box .btn', { hasText: 'Copy Backup Code' }).click(); await sleep(150);
     const bk = await page.locator('.bkp-area').inputValue();
     ok(bk.includes('"ep4.course"') && bk.includes('"ep4.lesson.u0l1"') && !bk.includes('ep4.sync'), 'backup contains course and lesson states, never the sync key');
@@ -245,7 +250,7 @@ function fakeGitHub(token) {
     const { ctx, page } = await newPage(null);
     await startApp(page);
     // الوضع المختصر
-    await page.locator('.qtile.exp').click(); await sleep(200);
+    await page.locator('.tool', { hasText: 'Express' }).click(); await sleep(200);
     for (let i = 0; i < 20; i++) {
       if ((await text(page)).includes('Express Review Logged')) break;
       const inp = page.locator('.gap-in:enabled'), opt = page.locator('.opt:enabled');
@@ -258,30 +263,31 @@ function fakeGitHub(token) {
     if (await page.locator('[aria-label="Close · إغلاق"]').count()) { await page.click('[aria-label="Close · إغلاق"]'); await sleep(150); }
     // الأفعال الشاذة
     await page.locator('.nav-it').nth(2).click(); await sleep(200);
-    await page.locator('.seg-b').nth(1).click(); await sleep(200);
-    await page.locator('.btn', { hasText: 'Practice Irregular Verbs' }).click(); await sleep(200);
+    await page.locator('.seg-b').nth(2).click(); await sleep(200); // التدريب: Mistakes · Words · Verbs
+    await page.locator('.btn', { hasText: /Practice irregular verbs/i }).click(); await sleep(200);
     for (let i = 0; i < 6; i++) { const ins = page.locator('.gap-in:enabled'); if ((await ins.count()) < 2) break; await ins.nth(0).fill('was'); await ins.nth(1).fill('been'); await ins.nth(1).press('Enter'); await sleep(100); await cta(page); }
     g = await getJSON(page, 'ep4.course');
     ok(Object.keys(g.irrSr).length === 6 && g.practiceMins >= 6, 'irregular-verb practice updates the shared schedule and practice minutes');
     if (await page.locator('[aria-label="Close · إغلاق"]').count()) { await page.click('[aria-label="Close · إغلاق"]'); await sleep(150); }
     // مختبر الأخطاء
-    await page.locator('.nav-it').nth(3).click(); await sleep(200);
+    await page.locator('.nav-it').nth(2).click(); await sleep(200);
     await page.locator('#elabHero .btn').click(); await sleep(200);
     for (let i = 0; i < 3; i++) { const opt = page.locator('.opt:enabled'); if (!(await opt.count())) break; await opt.first().click(); await sleep(100); await cta(page); }
     g = await getJSON(page, 'ep4.course');
     ok(Object.keys(g.errorLab).some(k => (g.errorLab[k].solved || 0) > 0 || (g.errorLab[k].box || 0) > 0), 'Error Lab drills update the shared Error Lab');
     if (await page.locator('[aria-label="Close · إغلاق"]').count()) { await page.click('[aria-label="Close · إغلاق"]'); await sleep(150); }
     // اختبار الوحدة 1 مقفل في جهاز جديد: لا يُختبر المتعلم في وحدة لم يدرسها
-    await page.locator('.nav-it').nth(0).click(); await sleep(200);
-    const ut1Tile = page.locator('.qtile', { hasText: 'Unit 1 Test' });
+    await expandUnit(page, 1);
+    const ut1Tile = unitBlock(page, 1).locator('.u-test');
     const ut1Tag = await ut1Tile.evaluate(el => el.tagName), ut1Txt = await ut1Tile.innerText();
     await ut1Tile.click(); await sleep(200);
     const ut1Opened = (await page.locator('.pl').count()) > 0;
-    if (ut1Opened) { await page.click('[aria-label="Close · إغلاق"]'); await sleep(150); await page.locator('.nav-it').nth(0).click(); await sleep(200); }
+    if (ut1Opened) { await page.click('[aria-label="Close · إغلاق"]'); await sleep(150); }
+    await page.locator('.nav-it').nth(0).click(); await sleep(200);
     g = await getJSON(page, 'ep4.course');
-    ok(ut1Tag === 'DIV' && ut1Txt.includes('Opens after Unit 1') && !ut1Opened && !(g.unitTests && g.unitTests[1]), 'the Unit 1 test tile is locked on Home ("Opens after Unit 1") and does not open');
+    ok(ut1Tag === 'DIV' && ut1Txt.includes('Opens after') && !ut1Opened && !(g.unitTests && g.unitTests[1]), 'the Unit 1 test row is locked in Course ("Opens after the unit lessons") and does not open');
     // كامبلي: بطاقة وحدة درس اليوم (الأسبوع التأسيسي ما دام F1 هو الدرس الحالي)
-    await page.locator('.qtile', { hasText: 'Cambly Card' }).click(); await sleep(200);
+    await page.locator('.tool', { hasText: 'Cambly card' }).click(); await sleep(200);
     const cSheet = await page.innerText('#sheetBox'), c0Title = await page.evaluate(() => DATA.camblyUnits[0].titleEn);
     await page.locator('#sheetBox .btn', { hasText: 'Log Cambly Session' }).click(); await sleep(150);
     g = await getJSON(page, 'ep4.course');
@@ -291,7 +297,7 @@ function fakeGitHub(token) {
     // درس اليوم ينتقل إلى التالي إذا اكتمل في يوم سابق
     await page.evaluate(() => { const y = Date.now() - 864e5 * 1.2; const l = JSON.parse(localStorage.getItem('ep4.lesson.u0l1') || '{"v":4}'); l.stamps = { recall:y, vocab:y, grammar:y, reading:y, writing:y, quiz:y }; localStorage.setItem('ep4.lesson.u0l1', JSON.stringify(l)); const g = JSON.parse(localStorage.getItem('ep4.course')); g.cur = 'u0l1'; localStorage.setItem('ep4.course', JSON.stringify(g)); });
     await page.reload(); await sleep(400);
-    await page.click('[aria-label="Open Lesson · افتح درس اليوم"]'); await sleep(250);
+    await page.locator('.nav-it').nth(0).click(); await sleep(250);
     ok((await text(page)).includes('Two Cases in Court'), "after finishing a lesson on a previous day, today's lesson moves to the next one");
     ok(page.errors.length === 0, 'no page errors (tools): ' + page.errors.join(' | '));
     await ctx.close();
@@ -330,7 +336,7 @@ function fakeGitHub(token) {
           }
           await sleep(1300); continue;
         }
-        const know = page.locator('.pl button:visible', { hasText: 'أعرفها' });
+        const know = page.locator('.pl button:visible', { hasText: 'I know it' });
         if (await know.count()) { await know.first().click(); await sleep(60); continue; }
         const opt = page.locator('.opt:enabled');
         if (await opt.count()) {
@@ -360,18 +366,19 @@ function fakeGitHub(token) {
     for (const { id: lid } of DRIVE) {
       if (lid === lockAt) {
         // درس تأسيسي واحد على الأقل لم يكتمل بعد: سطر اختبار الأسبوع مقفل في الرئيسية وفي شاشة الدروس
-        const lockedRow = async () => { const r = page.locator('.u0-test'); return (await r.count()) === 1 && (await r.evaluate(el => el.tagName)) === 'DIV' && (await r.locator('.u-lock').count()) === 1 && (await r.innerText()).includes('Opens after Foundation Week'); };
-        const onHome = await lockedRow();
+        const lockedRow = async () => { const r = page.locator('.u0-test'); return (await r.count()) === 1 && (await r.evaluate(el => el.tagName)) === 'DIV' && (await r.innerText()).includes('Opens after'); };
+        await page.locator('.nav-it').nth(0).click(); await sleep(200);
+        const onHome = (await page.locator('.u0-test, .tbanner').count()) === 0;
         if (await page.locator('.u0-test').count()) { await page.locator('.u0-test').click(); await sleep(150); }
         const noPlayer = !(await page.locator('.pl').count());
         if (!noPlayer) { await page.click('[aria-label="Close · إغلاق"]'); await sleep(150); }
-        await page.locator('.nav-it').nth(1).click(); await sleep(200);
+        await expandUnit(page, 0);
         const onLessons = await lockedRow();
         await page.locator('.nav-it').nth(0).click(); await sleep(200);
-        ok(onHome && noPlayer && onLessons, 'the Foundation Week test row is shown locked (Home and Lessons) while a foundation lesson is still incomplete');
+        ok(onHome && noPlayer && onLessons, 'the Foundation Week test is not offered on Today and its row is locked in Course while a foundation lesson is still incomplete');
       }
       const opened = await openLesson(page, lid);
-      if (opened) { await page.locator('.ld .btn').filter({ hasText: /Start Lesson|Continue/ }).first().click(); await sleep(200); }
+      if (opened) { await page.locator('.tp-card .btn').filter({ hasText: /Start|Continue/ }).first().click(); await sleep(200); }
       const finished = opened && await drive(lid);
       const st = await getJSON(page, 'ep4.lesson.' + lid);
       const stamped = st && st.stamps ? ['recall', 'vocab', 'grammar', 'reading', 'writing', 'quiz'].filter(k => st.stamps[k]).length : 0;
@@ -391,7 +398,7 @@ function fakeGitHub(token) {
     // دقائق اللوحة: 60 دقيقة لكل درس مكتمل (المراحل الست 5 + 8 + 12 + 17 + 10 + 8، أي 600 دقيقة لعشرة دروس)
     const MIN_PER_LESSON = 60, wantMins = DRIVE.length * MIN_PER_LESSON;
     await page.locator('.nav-it').nth(0).click(); await sleep(200);
-    await page.locator('.qtile').first().click(); await sleep(250);
+    await page.locator('.jr-more').first().click(); await sleep(250);
     const dash = await page.innerText('#sheetBox');
     ok(new RegExp('(?:^|\\D)' + wantMins + 'm').test(dash), 'dashboard counts the ' + DRIVE.length + ' completed lessons as ' + wantMins + ' minutes');
     await page.click('#sheetBox .close'); await sleep(100);
@@ -409,7 +416,7 @@ function fakeGitHub(token) {
     if (wl && !COURSE.some(l => l.id === wl.id)) wMsg = wl.id + ' is not an open lesson in content.js';
     else if (wl && !(await openLesson(page, wl.id))) wMsg = wl.id + ': its row in the unit list did not open it';
     else if (wl) {
-      await page.locator('.pstep').nth(4).click(); await sleep(200); await cta(page);
+      await page.locator('.pstep').nth(4).click(); await sleep(200);
       const ta = page.locator('textarea.wt');
       const attrs = await ta.evaluate(el => ['autocapitalize', 'autocorrect', 'spellcheck'].map(a => el.getAttribute(a)).join(','));
       await ta.fill(wl.model); await sleep(400); const onStraight = await page.locator('.checks li.on').count();
@@ -423,7 +430,7 @@ function fakeGitHub(token) {
     const unitDriven = u => COURSE.some(l => l.unit === u) && COURSE.filter(l => l.unit === u).every(l => DRIVE.includes(l));
     if (unitDriven(0)) {
       // اختبار الأسبوع التأسيسي: يُفتح بعد الدروس الخمسة، ويكتمل، وتُحفظ نتيجته في G.unitTests[0]
-      await page.locator('.nav-it').nth(0).click(); await sleep(200);
+      await expandUnit(page, 0);
       const u0btn = page.locator('button.u0-test');
       const u0open = (await u0btn.count()) === 1;
       let u0result = false, u0min = null;
@@ -449,10 +456,10 @@ function fakeGitHub(token) {
       // اختبار الوحدة 1: يُفتح بعد دروسها الخمسة، ويكتمل، وتُحفظ نتيجته في G.unitTests[1]، ومهمته تطلب minSentences جملة
       // بلاطة الرئيسية تتبع وحدة الدرس الحالي، فتُفحص حين يكون عنوانها Unit 1 وحده، وإلا فُتح الاختبار من سطره في كتلة الوحدة 1 في «الدروس»
       await page.locator('.nav-it').nth(0).click(); await sleep(200);
-      const t1 = page.locator('.qtile', { hasText: /\bUnit 1 Test\b/ });
+      const t1 = page.locator('.tbanner', { hasText: /\bUnit 1 test\b/ }).locator('button');
       const t1Home = (await t1.count()) === 1, t1Tag = t1Home ? await t1.evaluate(el => el.tagName) : null;
       let t1Result = false, t1Min = null, t1Btn = t1Tag === 'BUTTON' ? t1 : null;
-      if (!t1Home) { await page.locator('.nav-it').nth(1).click(); await sleep(200); const row = unitBlock(page, 1).locator('button.u-test'); if ((await row.count()) === 1) t1Btn = row; }
+      if (!t1Home) { await expandUnit(page, 1); const row = unitBlock(page, 1).locator('button.u-test'); if ((await row.count()) === 1) t1Btn = row; }
       if (t1Btn) {
         await t1Btn.click(); await sleep(250);
         await cta(page); // الركن القانوني ← السؤال الأول
@@ -479,7 +486,7 @@ function fakeGitHub(token) {
     async function reviewTyped(ex, v) {
       await page.evaluate(ex => { const g = JSON.parse(localStorage.getItem('ep4.course')); const t = Date.now(); g.mistakes[ex.lid + '|' + ex.id] = { lid: ex.lid, id: ex.id, box: 0, t: t, due: t - 1000 }; localStorage.setItem('ep4.course', JSON.stringify(g)); }, ex);
       await page.reload(); await sleep(400);
-      await page.locator('.nav-it').nth(3).click(); await sleep(250);
+      await page.locator('.nav-it').nth(2).click(); await sleep(250);
       if (!(await page.locator('#nbHero .btn').count())) return { bad: 0, good: 0, fb: '' };
       await page.locator('#nbHero .btn').click(); await sleep(250);
       if (!(await page.locator('.gap-in:enabled').count())) return { bad: 0, good: 0, fb: '' };
@@ -514,13 +521,13 @@ function fakeGitHub(token) {
     ok(!!gh.files['progress/course.json'] && !!gh.files['progress/lesson-u0l1.json'], 'connect uploads course.json and lesson-u0l1.json');
     ok(Object.values(gh.files).every(f => f.branch === 'progress'), 'every upload goes to the progress branch, never main');
     ok(Object.keys(gh.files).every(k => !Buffer.from(gh.files[k].content, 'base64').toString().includes('test-token')), 'the key is never uploaded');
-    ok((await page.innerText('#syncBox')).includes('On · مفعّلة'), 'settings show sync as On');
+    ok((await page.innerText('#syncBox')).includes('On'), 'settings show sync as On');
     firstStartedAt = (gh.json('progress/course.json') || {}).startedAt;
     await page.click('#sheetBox .close'); await sleep(150);
 
     // إنهاء مرحلة يرفع الدرس خلال ثوانٍ، بطلب PUT واحد لكل ملف تغيّر
     const putsBefore = gh.log.filter(x => x.startsWith('PUT')).length;
-    await page.click('[aria-label="Open Lesson · افتح درس اليوم"]'); await sleep(200);
+    await page.locator('.nav-it').nth(0).click(); await sleep(200);
     await doRecallStage(page, () => 'zzzz');
     await page.waitForFunction(() => { const m = JSON.parse(localStorage.getItem('ep4.syncmeta') || '{}'); return !m.dirtyAt; }, null, { timeout: 8000 }).catch(() => {});
     const lj = gh.json('progress/lesson-u0l1.json');
@@ -562,7 +569,7 @@ function fakeGitHub(token) {
     await page.click('#gearBtn'); await sleep(200);
     await page.fill('#syncToken', 'wrong-token');
     await page.click('#syncConnect'); await sleep(1200);
-    ok((await page.innerText('#syncBox')).includes('المفتاح غير صحيح'), 'a wrong key shows a clear Arabic message');
+    ok((await page.innerText('#syncBox')).includes('The key is invalid or expired.'), 'a wrong key shows a clear message');
     ok((await page.locator('#gearBtn .sync-dot').count()) === 1, 'a wrong key puts a small dot on the gear');
     await ctx.close();
   }
@@ -572,6 +579,7 @@ function fakeGitHub(token) {
     const { ctx, page } = await newPage(null);
     await startApp(page);
     await page.locator('.nav-it').nth(1).click(); await sleep(250);
+    { const more = page.locator('button.tl-row', { hasText: /^Units \d+ to \d+/ }); if (await more.count()) { await more.click(); await sleep(200); } } // الوحدات المطوية (6 إلى 12)
     const unitCard = u => page.locator('.u-card-wrap').filter({ has: page.locator('.u-n', { hasText: new RegExp('^' + u + '$') }) });
     const openPre = async u => { await unitCard(u).locator('button.btn').click(); await sleep(250); };
     const preRec = async u => { const g = await getJSON(page, 'ep4.course'); return (g.preTests || {})[u] || null; };
@@ -588,7 +596,7 @@ function fakeGitHub(token) {
       fb: await page.locator('.fb').count(),
       verdict: await page.locator('.gap-in.ok, .gap-in.bad, .opt.ok, .opt.bad, .opt.dim, .blank.ok, .blank.bad').count(),
       saved: await page.locator('.gap-in.saved, .opt.chosen').count(),
-      note: (await text(page)).includes('Answer saved · حُفظت إجابتك')
+      note: (await text(page)).includes('Answer saved')
     });
 
     // 1) الوحدة 9: مقدمة المحاولة الأولى، ثم كل البنود صحيحة
@@ -638,7 +646,7 @@ function fakeGitHub(token) {
     ok(r9 && r9.v === 2 && r9.attempts === 1 && r9.first && r9.first.sc === its9.length && r9.first.done === true && r9.exempt === true && r9.last === undefined, 'first attempt record: version 2, one attempt, 10/10, done, exempt, no practice score yet: ' + JSON.stringify(r9));
     await cta(page); // رجوع للدروس
     const lc9 = await unitCard(9).innerText();
-    ok(/Exempted \(100%\)/.test(lc9) && lc9.includes('معفى منها') && /Practice/.test(lc9) && !/Pre-Test Available/.test(lc9), 'lessons chip: "Exempted (100%)" and the button becomes "Practice"');
+    ok(/Exempted \(100%\)/.test(lc9) && /Practice/.test(lc9) && !/Pre-Test Available/.test(lc9), 'lessons chip: "Exempted (100%)" and the button becomes "Practice"');
 
     // 3) محاولة تدريب بإجابات خاطئة: لا تلغي الإعفاء
     await openPre(9);
@@ -661,7 +669,7 @@ function fakeGitHub(token) {
     await page.click('[aria-label="Close · إغلاق"]'); await sleep(250);
     const r5 = await preRec(5), lc5 = await unitCard(5).innerText();
     ok(r5 && r5.v === 2 && r5.attempts === 1 && r5.first && r5.first.sc === 1 && r5.first.n === its5.length && r5.first.done === false && r5.exempt === false, 'leaving after one answer still counts as the first attempt (1/10, not done, not exempt): ' + JSON.stringify(r5));
-    ok(/First attempt: 10%/.test(lc5) && lc5.includes('المحاولة الأولى') && /Practice/.test(lc5) && !/Exempted/.test(lc5), 'lessons chip shows the first-attempt percent and the button becomes "Practice"');
+    ok(/First attempt: 10%/.test(lc5) && /Practice/.test(lc5) && !/Exempted/.test(lc5), 'lessons chip shows the first-attempt percent and the button becomes "Practice"');
     await openPre(5);
     const intro5 = await text(page);
     ok(/This is a practice attempt/.test(intro5) && /already counted \(10%\)/.test(intro5) && !/Only your FIRST attempt counts/.test(intro5), 'reopening after an abandoned first attempt shows a practice attempt');
@@ -675,6 +683,7 @@ function fakeGitHub(token) {
     await page.evaluate(() => { const g = JSON.parse(localStorage.getItem('ep4.course')); g.preTests[8] = { v: 1, attempts: 3, first: { sc: 10, n: 10, done: true, at: 1 }, exempt: true, last: 10, best: 10 }; g.preTests[12] = { best: 10, last: 10, exempt: true, at: 1 }; localStorage.setItem('ep4.course', JSON.stringify(g)); });
     await page.reload(); await sleep(400);
     await page.locator('.nav-it').nth(1).click(); await sleep(250);
+    { const more = page.locator('button.tl-row', { hasText: /^Units \d+ to \d+/ }); if (await more.count()) { await more.click(); await sleep(200); } } // الوحدات المطوية (6 إلى 12)
     const lc8 = await unitCard(8).innerText(), lc12 = await unitCard(12).innerText();
     ok(/Pre-Test Available/.test(lc8) && !/Exempted/.test(lc8) && /Pre-Test Available/.test(lc12) && !/Exempted/.test(lc12), 'records saved for an older version (or in the old format) are ignored on the lessons screen');
     const its8 = await items(8);

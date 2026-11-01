@@ -115,35 +115,36 @@ function serve(root) {
       await page.reload(); await sleep(400);
       return { ctx, page };
     }
-    // الرئيسية: عنوان قسم الدروس وبطاقاته، وبلاطة اختبار الوحدة
+    // تصميم 1 نوفمبر 2026: «Today» تعرض مكانك (الوحدة والدرس) واسم الدرس، و«Course» يعرض الوحدات خطًّا واحدًا،
+    // والوحدة المفتوحة بطاقة (.tl-it.open) فيها سطور قائمتها هي، وسطر اختبارها.
     const homeInfo = page => page.evaluate(() => {
-      const cards = document.querySelector('#screen .lcards'), h2 = cards && cards.previousElementSibling && cards.previousElementSibling.querySelector('h2');
-      const tile = Array.from(document.querySelectorAll('#screen .quick-grid .qtile')).find(el => /Test & Legal Corner/.test(el.textContent));
-      return {
-        en: h2 ? h2.querySelector('.en').textContent : null, ar: h2 ? h2.querySelector('small').textContent : null,
-        cards: cards ? Array.from(cards.querySelectorAll('.lcard')).map(c => ({ title: c.querySelector('.l-title').textContent, sub: c.querySelector('.l-sub').textContent })) : [],
-        tile: tile ? { tag: tile.tagName, en: tile.querySelector('.bi-en').textContent, ar: tile.querySelector('.bi-ar').textContent, lock: (tile.querySelector('.u-lock-t') || {}).textContent || '' } : null
-      };
+      const q = s => { const el = document.querySelector('#screen ' + s); return el ? el.textContent : null; };
+      return { place: q('.jr-place'), sub: q('.jr-sub'), lbl: q('.td-lbl'), title: q('.td-title'), banner: q('.tbanner') };
     });
-    // شاشة «الدروس»: كل وحدة مفتوحة برقمها واسمها وسطور قائمتها
-    const lessonsInfo = page => page.evaluate(() => Array.from(document.querySelectorAll('#screen .unit-open')).map(b => ({
-      n: b.querySelector('.uo-head .u-n').textContent, en: b.querySelector('.uo-head .uo-en').textContent,
-      rows: Array.from(b.querySelectorAll('.uo-list > li')).map(li => ({
-        title: li.querySelector('.uo-t b').textContent,
-        test: !!li.querySelector('.u-test'), open: !!li.querySelector('button.uo-row'),
-        lock: (li.querySelector('.u-lock-t') || {}).textContent || ''
-      }))
-    })));
+    const courseInfo = page => page.evaluate(() => Array.from(document.querySelectorAll('#screen .tl > .tl-it')).map(li => {
+      const open = li.classList.contains('open'), nEl = li.querySelector(':scope > .u-n');
+      return {
+        n: nEl ? nEl.textContent : '', open,
+        name: open ? li.querySelector('.tl-head .tl-t b').textContent : ((li.querySelector('.tl-t b') || {}).textContent || ''),
+        rows: open ? Array.from(li.querySelectorAll('.cl-list > li')).map(r => ({
+          title: (r.querySelector('.cl-t b') || {}).textContent, test: !!r.querySelector('.u-test, .u0-test'),
+          open: !!r.querySelector('button.cl-row'), lock: r.querySelector('.cl-row.locked') ? r.textContent : '' })) : null
+      };
+    }));
     const want = page => page.evaluate(() => ({
       u1: DATA.unit1Lessons.map(l => l.en), u1Lessons: DATA.unit1Lessons.filter(l => !l.test).length, u1Name: DATA.units.find(u => u.n === 1).en,
-      u2: DATA.unit2Lessons.map(l => l.en), u2Name: DATA.units.find(u => u.n === 2).en
+      u2: DATA.unit2Lessons.map(l => l.en), u2Lessons: DATA.unit2Lessons.filter(l => !l.test).map(l => l.en), u2Name: DATA.units.find(u => u.n === 2).en,
+      u1Titles: DATA.unit1Lessons.filter(l => !l.test).map(l => l.en)
     }));
-    const homeIs = (hm, u, titles) => hm.en === 'Unit ' + u + ' Lessons' && hm.ar === 'دروس الوحدة ' + u && same(hm.cards.map(c => c.title), titles.slice(0, 3));
-    const tileIs = (hm, u, ar) => !!hm.tile && hm.tile.en === 'Unit ' + u + ' Test & Legal Corner' && hm.tile.ar === 'اختبار الوحدة ' + ar + ' والركن القانوني';
+    const homeIs = (hm, u, name, n) => hm.place === 'Unit ' + u + ' · ' + name && hm.lbl === 'Unit ' + u + ' · Lesson ' + n;
     const goTab = async (page, i) => { await page.locator('.nav-it').nth(i).click(); await sleep(250); };
-    const backHome = async page => { await page.locator('[aria-label="Back · رجوع"]').click(); await sleep(250); };
+    const expand = async (page, u) => {
+      const li = page.locator('#screen .tl > .tl-it').filter({ has: page.locator(':scope > .u-n', { hasText: new RegExp('^' + u + '$') }) });
+      if (!(await li.evaluate(el => el.classList.contains('open')))) { await li.locator('button.tl-row').click(); await sleep(250); }
+    };
+    const unitOf = (L, u) => L.find(b => b.n === String(u)) || { rows: null };
 
-    /* ---------------- أ) درس اليوم u2l2: الوحدة 2 في الرئيسية، وكل وحدة بقائمتها في «الدروس» ---------------- */
+    /* ---------------- أ) درس اليوم u2l2: الوحدة 2 في «Today»، وكل وحدة بقائمتها في «Course» ---------------- */
     {
       const { ctx, page } = await openWith({ cur: 'u2l2' });
       const pre = await page.evaluate(() => ({
@@ -158,67 +159,69 @@ function serve(root) {
       const W = await want(page);
 
       let hm = await homeInfo(page);
-      ok(homeIs(hm, 2, W.u2), 'home heading says "Unit 2 Lessons · دروس الوحدة 2" and its cards are the first three entries of unit2Lessons: ' + JSON.stringify({ en: hm.en, ar: hm.ar, cards: hm.cards.map(c => c.title) }));
-      ok(hm.cards.length === 3 && hm.cards[1].sub.includes(U2[1].ar) && !hm.cards[1].sub.includes('الأسئلة والإجابات القصيرة'),
-        'a unit-2 card without shortAr shows its own Arabic title, not a unit-1 short title: ' + JSON.stringify(hm.cards[1] && hm.cards[1].sub));
-      ok(tileIs(hm, 2, '٢') && hm.tile.tag === 'DIV' && hm.tile.lock.includes('Opens after Unit 2') && !/Unit 1/.test(hm.tile.en + hm.tile.lock),
-        'the unit-test tile is for unit 2 ("Unit 2 Test & Legal Corner · اختبار الوحدة ٢", locked: "Opens after Unit 2"): ' + JSON.stringify(hm.tile));
+      ok(homeIs(hm, 2, W.u2Name, 2) && hm.sub === 'Lesson 2 of ' + W.u2Lessons.length,
+        'Today places you in unit 2, lesson 2 of unit 2\'s own lessons: ' + JSON.stringify(hm));
+      ok(hm.title === W.u2Lessons[1], 'Today shows the current lesson\'s own title from unit 2\'s list: ' + JSON.stringify(hm.title));
+      ok(hm.banner === null, 'no unit-test banner on Today while unit 2\'s lessons are not finished');
 
       await goTab(page, 1);
-      let L = await lessonsInfo(page);
-      const i1 = L.findIndex(b => b.n === '1'), i2 = L.findIndex(b => b.n === '2');
-      const b1 = L[i1] || { rows: [] }, b2 = L[i2] || { rows: [] };
-      ok(i1 >= 0 && i2 > i1 && L.filter(b => b.n === '1').length === 1 && L.filter(b => b.n === '2').length === 1 && b1.en === W.u1Name && b2.en === W.u2Name,
-        'the lessons tab shows unit 1 then unit 2 as open units, once each, each under its own header: ' + JSON.stringify(L.map(b => b.n + ' ' + b.en)));
-      ok(same(b1.rows.map(r => r.title), W.u1) && b1.rows.filter(r => !r.test && r.open).length === W.u1Lessons && W.u1Lessons === 5
-        && b1.rows.filter(r => r.test).length === 1 && b1.rows.find(r => r.test).lock.includes('Opens after Unit 1'),
-        "unit 1's header lists unit 1's own " + W.u1Lessons + ' lessons and its test row ("Opens after Unit 1"): ' + JSON.stringify(b1.rows.map(r => r.title)));
-      ok(same(b2.rows.map(r => r.title), W.u2) && b2.rows.filter(r => !r.test && r.open).length === 2
-        && b2.rows.filter(r => r.test).length === 1 && b2.rows.find(r => r.test).lock.includes('Opens after Unit 2'),
-        "unit 2's header lists unit 2's own two lessons and its test row (\"Opens after Unit 2\"), not unit 1's list: " + JSON.stringify(b2.rows.map(r => r.title)));
+      let L = await courseInfo(page);
+      const n1 = L.filter(b => b.n === '1').length, n2 = L.filter(b => b.n === '2').length;
+      ok(n1 === 1 && n2 === 1 && unitOf(L, 1).name === W.u1Name && unitOf(L, 2).open && unitOf(L, 2).name === W.u2Name && L.findIndex(b => b.n === '1') < L.findIndex(b => b.n === '2'),
+        'Course shows unit 1 then unit 2, once each, with the current unit (2) open: ' + JSON.stringify(L.map(b => b.n + (b.open ? '*' : '') + ' ' + b.name)));
+      const b2 = unitOf(L, 2);
+      ok(same((b2.rows || []).map(r => r.title), W.u2) && b2.rows.filter(r => !r.test && r.open).length === 2 && b2.rows.filter(r => r.test).length === 1 && b2.rows.find(r => r.test).lock.includes('Opens after'),
+        "unit 2's card lists unit 2's own two lessons and its locked test row, not unit 1's list: " + JSON.stringify((b2.rows || []).map(r => r.title)));
+      await expand(page, 1);
+      L = await courseInfo(page);
+      const b1 = unitOf(L, 1);
+      ok(same((b1.rows || []).map(r => r.title), W.u1) && b1.rows.filter(r => !r.test && r.open).length === W.u1Lessons && W.u1Lessons === 5
+        && b1.rows.filter(r => r.test).length === 1 && b1.rows.find(r => r.test).lock.includes('Opens after') && !unitOf(L, 2).open,
+        "opening unit 1 lists its own " + W.u1Lessons + ' lessons and its locked test row, and folds unit 2: ' + JSON.stringify((b1.rows || []).map(r => r.title)));
 
-      // فتح درس من قائمة الوحدة 2 يجعله درس اليوم، والرئيسية تبقى على الوحدة 2
-      await page.locator('.unit-open').nth(1).locator('button.uo-row').first().click(); await sleep(250);
-      const g1 = await getJSON(page, 'ep4.course'), inLesson = (await page.locator('#screen .ld').count()) === 1;
-      await backHome(page);
+      // فتح درس من قائمة الوحدة 2 يجعله درس اليوم، و«Today» تبقى على الوحدة 2
+      await expand(page, 2);
+      await page.locator('#screen .tl-it.open button.cl-row').first().click(); await sleep(250);
+      const g1 = await getJSON(page, 'ep4.course');
       hm = await homeInfo(page);
-      ok(inLesson && g1.cur === 'u2l1' && homeIs(hm, 2, W.u2) && tileIs(hm, 2, '٢'), "opening unit 2's first lesson row opens u2l1 (G.cur = " + g1.cur + '), and home stays on unit 2');
+      ok(g1.cur === 'u2l1' && homeIs(hm, 2, W.u2Name, 1), "opening unit 2's first lesson row makes u2l1 current (G.cur = " + g1.cur + ') and Today shows it in unit 2: ' + JSON.stringify(hm));
 
-      // درس اليوم يعود إلى الوحدة 1: الرئيسية تعرض الوحدة 1 من جديد، وتبقى عليها بعد إعادة التحميل
+      // درس اليوم يعود إلى الوحدة 1، ويبقى بعد إعادة التحميل
       await goTab(page, 1);
-      await page.locator('.unit-open').nth(0).locator('button.uo-row').nth(2).click(); await sleep(250);
+      await expand(page, 1);
+      await page.locator('#screen .tl-it.open .cl-list > li').nth(2).locator('button.cl-row').click(); await sleep(250);
       const g2 = await getJSON(page, 'ep4.course');
-      await backHome(page);
       hm = await homeInfo(page);
-      ok(g2.cur === 'u1l3' && homeIs(hm, 1, W.u1) && tileIs(hm, 1, '١') && hm.tile.lock.includes('Opens after Unit 1'),
-        'with the current lesson back in unit 1 (u1l3), home shows "Unit 1 Lessons", unit 1\'s first three cards and the Unit 1 test tile: ' + JSON.stringify({ cur: g2.cur, en: hm.en, cards: hm.cards.map(c => c.title), tile: hm.tile && hm.tile.en }));
+      ok(g2.cur === 'u1l3' && homeIs(hm, 1, W.u1Name, 3) && hm.title === W.u1Titles[2], 'with the current lesson back in unit 1 (u1l3), Today shows unit 1, lesson 3: ' + JSON.stringify({ cur: g2.cur, hm }));
       await page.reload(); await sleep(400);
       hm = await homeInfo(page);
-      ok(homeIs(hm, 1, W.u1) && tileIs(hm, 1, '١'), 'after a reload the home still shows unit 1 (the saved current lesson is u1l3)');
+      ok(homeIs(hm, 1, W.u1Name, 3), 'after a reload Today still shows unit 1 (the saved current lesson is u1l3)');
       await goTab(page, 1);
-      L = await lessonsInfo(page);
-      const c1 = L.find(b => b.n === '1'), c2 = L.find(b => b.n === '2');
-      ok(!!c1 && !!c2 && same(c1.rows.map(r => r.title), W.u1) && same(c2.rows.map(r => r.title), W.u2), 'the lessons tab is the same whichever unit is current');
+      await expand(page, 1); let c1 = unitOf(await courseInfo(page), 1);
+      await expand(page, 2); let c2 = unitOf(await courseInfo(page), 2);
+      ok(same((c1.rows || []).map(r => r.title), W.u1) && same((c2.rows || []).map(r => r.title), W.u2), 'each unit keeps its own list whichever unit is current');
       ok(page.errors.length === 0, 'no page errors (unit 2 current): ' + page.errors.join(' | '));
       await ctx.close();
     }
 
-    /* ---------------- ب) درس من الأسبوع التأسيسي: أول وحدة مفتوحة لم تكتمل دروسها ---------------- */
+    /* ---------------- ب) درس من الأسبوع التأسيسي، واختبار كل وحدة يتبع دروسها هي ---------------- */
     {
       const { ctx, page } = await openWith({ cur: 'u0l1' });
-      const W = await want(page), hm = await homeInfo(page);
-      ok(homeIs(hm, 1, W.u1) && tileIs(hm, 1, '١'), 'with a Foundation lesson current and unit 1 not finished, home shows unit 1 (lessons and test tile)');
+      const hm = await homeInfo(page);
+      ok(hm.place === 'Foundation Week' && hm.lbl === 'Foundation Week · Lesson 1', 'with a Foundation lesson current, Today places you in Foundation Week, lesson 1: ' + JSON.stringify(hm));
+      await goTab(page, 1);
+      const L = await courseInfo(page);
+      ok(unitOf(L, 0).open && !unitOf(L, 1).open, 'Course opens the Foundation Week card, the unit of the current lesson');
       ok(page.errors.length === 0, 'no page errors (Foundation lesson, unit 1 open): ' + page.errors.join(' | '));
       await ctx.close();
     }
     {
       const { ctx, page } = await openWith({ cur: 'u0l1', doneUnit1: true });
-      const W = await want(page), g = await getJSON(page, 'ep4.course'), hm = await homeInfo(page);
-      ok(g.cur === 'u0l1' && homeIs(hm, 2, W.u2) && tileIs(hm, 2, '٢') && hm.tile.lock.includes('Opens after Unit 2'),
-        'with a Foundation lesson current and unit 1 finished, home shows the next open unit that is not finished (unit 2): ' + JSON.stringify({ cur: g.cur, en: hm.en, tile: hm.tile && hm.tile.en }));
+      const g = await getJSON(page, 'ep4.course');
       await goTab(page, 1);
-      const L = await lessonsInfo(page), t1 = (L.find(b => b.n === '1') || { rows: [] }).rows.find(r => r.test), t2 = (L.find(b => b.n === '2') || { rows: [] }).rows.find(r => r.test);
-      ok(!!t1 && t1.open && !t1.lock && !!t2 && !t2.open && t2.lock.includes('Opens after Unit 2'),
+      await expand(page, 1); const t1 = (unitOf(await courseInfo(page), 1).rows || []).find(r => r.test);
+      await expand(page, 2); const t2 = (unitOf(await courseInfo(page), 2).rows || []).find(r => r.test);
+      ok(g.cur === 'u0l1' && !!t1 && t1.open && !t1.lock && !!t2 && !t2.open && t2.lock.includes('Opens after'),
         "each unit's test row follows its own unit: unit 1's opens (its lessons are done), unit 2's stays locked: " + JSON.stringify({ t1, t2 }));
       ok(page.errors.length === 0, 'no page errors (Foundation lesson, unit 1 finished): ' + page.errors.join(' | '));
       await ctx.close();
